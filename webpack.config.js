@@ -1,0 +1,235 @@
+var webpack = require("webpack"),
+  path = require("path"),
+  env = require("./utils/env"),
+  CopyWebpackPlugin = require("copy-webpack-plugin"),
+  HtmlWebpackPlugin = require("html-webpack-plugin"),
+  TerserPlugin = require("terser-webpack-plugin");
+var { CleanWebpackPlugin } = require("clean-webpack-plugin");
+
+const ASSET_PATH = process.env.ASSET_PATH || "/";
+
+var fileExtensions = [
+  "jpg",
+  "jpeg",
+  "png",
+  "gif",
+  "eot",
+  "otf",
+  "svg",
+  "ttf",
+  "woff",
+  "woff2",
+];
+
+const isDevelopment = process.env.NODE_ENV !== "production";
+
+var options = {
+  mode: process.env.NODE_ENV || "development",
+  ignoreWarnings: [
+    /Circular dependency between chunks with runtime/,
+    /ResizeObserver loop completed with undelivered notifications/,
+    /Should not import the named export/,
+    /Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0/,
+    /Global built-in functions are deprecated and will be removed in Dart Sass 3.0.0./,
+    /repetitive deprecation warnings omitted/,
+  ],
+
+  entry: {
+    popup: path.join(__dirname, "src", "popup.ts"),
+    "service-worker": path.join(__dirname, "src", "background", "service-worker.ts"),
+    content: path.join(__dirname, "src", "content", "content.ts"),
+    "inject-api": path.join(__dirname, "src", "content", "inject-api.ts"),
+    intercept: path.join(__dirname, "src", "content", "intercept.ts"),
+    offscreen: path.join(__dirname, "src", "background", "offscreen", "offscreen.ts"),
+    test: path.join(__dirname, "src", "background", "offscreen", "test.ts"),
+  },
+  // chromeExtensionBoilerplate: {
+  //   notHotReload: ["background", "contentScript", "devtools"],
+  // },
+  output: {
+    filename: "[name].bundle.js",
+    path: path.resolve(__dirname, "build"),
+    clean: true,
+    publicPath: ASSET_PATH,
+  },
+  module: {
+    rules: [
+      {
+        // look for .css or .scss files
+        test: /\.(css|scss)$/,
+        // in the `src` directory
+        use: [
+          {
+            loader: "style-loader",
+          },
+          {
+            loader: "css-loader",
+            options: { importLoaders: 1 },
+          },
+          {
+            loader: "postcss-loader",
+          },
+          {
+            loader: "sass-loader",
+            options: {
+              sourceMap: true,
+              sassOptions: {
+                silenceDeprecations: ["legacy-js-api"],
+              }
+            },
+          },
+        ],
+      },
+      {
+        test: /\.html$/,
+        loader: "html-loader",
+        exclude: /node_modules/,
+      },
+      {
+        test: /\.(ts|tsx)$/,
+        exclude: /node_modules/,
+        use: [
+          {
+            loader: require.resolve("ts-loader"),
+            options: {
+              transpileOnly: isDevelopment,
+            },
+          },
+        ],
+      },
+      {
+        test: /\.(js|jsx)$/,
+        use: [
+          {
+            loader: "source-map-loader",
+          },
+          {
+            loader: require.resolve("babel-loader"),
+          },
+        ],
+        exclude: /node_modules/,
+      },
+    ],
+  },
+  resolve: {
+    extensions: fileExtensions
+      .map((extension) => "." + extension)
+      .concat([".js", ".jsx", ".ts", ".tsx", ".css"]),
+  },
+  plugins: [
+    new CleanWebpackPlugin({ verbose: false }),
+    new webpack.ProgressPlugin(),
+    // expose and write the allowed env vars on the compiled bundle
+    new webpack.EnvironmentPlugin(["NODE_ENV"]),
+    // new ExtReloader({
+    //   manifest: path.resolve(__dirname, "src/manifest.json")
+    // }),
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: "src/manifest.json",
+          to: path.join(__dirname, "build"),
+          force: true,
+          transform: function (content, path) {
+            // generates the manifest file using the package.json informations
+            return Buffer.from(
+              JSON.stringify({
+                description: process.env.npm_package_description,
+                version: process.env.npm_package_version,
+                ...JSON.parse(content.toString()),
+              })
+            );
+          },
+        },
+      ],
+    }),
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: "styles.css",
+          to: path.join(__dirname, "build"),
+          force: true,
+        },
+      ],
+    }),
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: "src/icon128.png",
+          to: path.join(__dirname, "build"),
+          force: true,
+        },
+      ],
+    }),
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: "node_modules/tlsn-js/build",
+          to: path.join(__dirname, "build"),
+          force: true,
+        },
+      ],
+    }),
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: path.join(__dirname, "src", "popup.html"),
+          to: path.join(__dirname, "build"),
+        },
+      ],
+    }),
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: path.join(__dirname, "src", "background", "offscreen", "offscreen.html"),
+          to: path.join(__dirname, "build"),
+        },
+      ],
+    }),
+    /* new HtmlWebpackPlugin({
+      template: path.join(__dirname, "src", "popup.html"),
+      filename: "popup.html",
+      chunks: ["popup"],
+      cache: false,
+      inject: false,
+    }),
+    new HtmlWebpackPlugin({
+      template: path.join(__dirname, "src", "background", "offscreen", "offscreen.html"),
+      filename: "offscreen.html",
+      chunks: ["offscreen"],
+      cache: false,
+      inject: false,
+    }), */
+    new webpack.ProvidePlugin({
+      Buffer: ['buffer', 'Buffer'],
+    }),
+  ].filter(Boolean),
+  infrastructureLogging: {
+    level: "info",
+  },
+  // Required by wasm-bindgen-rayon, in order to use SharedArrayBuffer on the Web
+  // Ref:
+  //  - https://github.com/GoogleChromeLabs/wasm-bindgen-rayon#setting-up
+  //  - https://web.dev/i18n/en/coop-coep/
+  devServer: {
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    }
+  },
+};
+
+if (env.NODE_ENV === "development") {
+  options.devtool = "cheap-module-source-map";
+} else {
+  options.optimization = {
+    minimize: true,
+    minimizer: [
+      new TerserPlugin({
+        extractComments: false,
+      }),
+    ],
+  };
+}
+
+module.exports = options;
