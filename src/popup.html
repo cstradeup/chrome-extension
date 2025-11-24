@@ -1,35 +1,193 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <title>CSTradeUp Inventory Helper</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="stylesheet" href="styles.css">
-  <style>
-    body { font-family: Arial, sans-serif; width: 360px; padding: 12px; }
-    label { display:block; margin-top:8px; font-size:12px; color:#333; }
-    input, textarea { width:100%; box-sizing:border-box; padding:6px; }
-    button { margin-top:8px; padding:8px 12px; width:100%; }
-    #status { margin-top:8px; font-size:12px; color:#666; }
-    .row { display:flex; gap:8px; align-items:center; }
-    .flex { flex:1; }
-  </style>
-</head>
-<body class="popup-card max-w-sm mx-auto" >
+  <head>
+    <meta charset="utf-8" />
+    <title>CSTradeUp Inventory Helper</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        width: 384px;
+        padding: 12px;
+        background-color: #042f2e;
+      }
+      .popedup{
+        height: calc(100% - 24px);
+        width: calc(100% - 24px);
+        max-height: calc(100% - 24px);
+        max-width: calc(100% - 24px);
+      }
+    </style>
+  </head>
+  <body class="flex flex-col max-w-sm mx-auto text-slate-100">
 
-  <h1 class="text-xl font-semibold mb-2">CSTradeUp Inventory Helper</h1>
+    <div class="mb-4 flex flex-row items-center justify-between">
+      <div class="flex flex-row gap-1 items-center">
+        <img
+          src="icon128.png"
+          alt="CSTradeUp Logo"
+          class="w-6 inline-block mr-2"
+        />
+        <h1 class="text-xl font-semibold">CSTradeUp Inventory Helper</h1>
+      </div>
 
-  <label>Last Updated:</label>
-  <span id="lastUpdated" ></span>
+      <div
+        id="open_options"
+        class="cursor-pointer"
+      >
+        ⚙️
+      </div>
+    </div>
+    
 
-  <button id="start" class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700" >Update Inventory</button>
-  <div id="status" class="mt-2 text-sm text-gray-700"></div>
+    <div class="flex flex-row gap-1 mb-1" >
 
-  <button id="start_inventory_history" class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700" >Update Inventory History</button>
-  <div id="status_inventory_history" class="mt-2 text-sm text-gray-700"></div>
+      <div class="flex flex-col gap-1 p-2 rounded bg-teal-900 w-full min-w-fit">
+        <div class="flex flex-row gap-1">
+          <span class="text-xs">⚡️</span>
+          <span class="text-xs">Items</span>
+        </div>
 
-  <a href="http://localhost:3000/account" target="_blank" >View Inventory</a>
+        <p class="text-2xl font-semibold" id="total_items">
+          0
+        </p>
+      </div>
 
-  <script src="popup.bundle.js"></script>
-</body>
+      <div class="flex flex-col gap-1 p-2 rounded bg-teal-900 w-full min-w-fit">
+        <div class="flex flex-row gap-1">
+          <span class="text-xs">🧾</span>
+          <span class="text-xs">Trade Ups</span>
+        </div>
+
+        <p class="text-2xl font-semibold" id="tradeup_items">
+          0
+        </p>
+      </div>
+
+      <div class="flex flex-col gap-1 p-2 rounded bg-teal-900 w-full min-w-fit">
+        <div class="flex flex-row gap-1">
+          <span class="text-xs">📦</span>
+          <span class="text-xs">Storage Unit Items</span>
+        </div>
+
+        <p class="text-2xl font-semibold" id="storeage_unit_items">
+          0
+        </p>
+      </div>
+
+    </div>
+
+    <div class="flex flex-row gap-1 text-black mb-2" >
+      <div class="flex flex-col gap-1 p-2 rounded bg-slate-300 w-full">
+
+        <button
+          id="start"
+          class="w-full px-3 py-1 font-semibold rounded bg-teal-800 hover:bg-teal-700 text-white"
+        >
+          Load Inventory
+        </button>
+
+        <div>
+          <label class="text-[9px]">Last Updated:</label>
+          <span class="text-[9px]" id="inventory_last_updated">Never</span>
+        </div>
+
+
+        <div class="flex justify-center items-center">
+          <div id="status" class=" text-sm"></div>
+        </div>
+        
+      </div>
+
+      <div class="flex flex-col gap-1 p-2 rounded bg-slate-300 w-full">
+
+        <button
+          id="start_inventory_history"
+          class="w-full px-3 py-1 font-semibold rounded bg-teal-800 hover:bg-teal-700 text-white"
+        >
+          Load Inventory History
+        </button>
+
+        <div>
+          <label class="text-[9px]" >Last Updated:</label>
+          <span class="text-[9px]" id="inventory_history_last_updated">Never</span>
+        </div>
+
+        <div class="flex justify-center items-center">
+          <div
+            id="status_inventory_history"
+            class="text-sm"
+          ></div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="flex justify-center items-center w-full">
+      <a href="http://localhost:3000/account" target="_blank">View Inventory</a>
+    </div>
+    
+    <div class="mt-4">
+      <div>
+        <span>status:</span>
+        <span id="app_status" class="text-xs"></span>
+      </div>
+      <span id="app_status_message" class="text-xs"></span>
+    </div>
+
+    <div id="login_cstradeup" class="hidden absolute bottom-2 left-2">
+      <a href="http://localhost:3000/auth/steam" target="_blank"
+        >Login to CSTradeUp</a
+      >
+    </div>
+
+    <div id="login_steam" class="hidden absolute bottom-2 right-2">
+      <a href="https://steamcommunity.com/login/home/?goto=%2F" target="_blank"
+        >Login to Steam</a
+      >
+    </div>
+
+    <div id="devtools" class="hidden absolute popedup flex flex-col gap-1 p-2 bg-gray-700 rounded">
+      
+      <div class="relative w-full">
+        <h2 class="text-sm font-semibold">🛠️ Dev Tools</h2>
+        <button
+          id="close_devtools"
+          class="absolute top-0 right-0 bg-red-600 rounded px-1 hover:bg-red-700"
+        >
+          X
+        </button>
+      </div>
+
+
+      <div class="flex flex-col">
+        <pre
+          id="logs"
+          class="mt-2 text-xs text-gray-200 max-h-24 overflow-y-auto"
+        ></pre>
+        
+        <button class="text-xs" id="clear_logs">🧹 clear logs</button>
+      </div>
+
+      <hr class="my-2 border-gray-500" />
+
+      <div class="flex flex-col">
+        <button class="text-xs" id="show_debug">👀 show store data</button>
+
+        <div id="debug" class="hidden">
+          <pre class="mt-2 text-xs text-gray-200"></pre>
+        </div>
+
+        <button
+            id="nuke_storage"
+            class="px-1 py-1 rounded bg-red-600 text-xs hover:bg-red-700"
+          >
+            💥 Nuke Storage
+          </button>
+      </div>
+    </div>
+
+    <script src="popup.bundle.js"></script>
+  </body>
 </html>

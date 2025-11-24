@@ -2,16 +2,25 @@
 
 import {
   isApiPostPayload,
+  isAppStateUpdate,
   isInventoryPayload,
+  isLogMessage,
+  isOffscreenPayloadMessage,
   isStartInventoryHistoryPayload,
+  isUpdateCursor,
   MessageType,
   PayloadMessage,
 } from "../lib/app";
-import { notarizeSteamRequestAndSendToBackend } from "./offscreen/notarize/notarize";
 import { hasPermission } from "../lib/permission";
+import { getAppState, updateStatus, updateSyncedStorageUnitItems, updateSyncedTradeupItems } from "../lib/storage/reducer/app";
+import { saveHistoryCursor } from "../lib/storage/reducer/cstradeup";
+import { appendDevLog } from "../lib/storage/reducer/logs";
+import { loadInventoryHistory } from "./services/notary";
 const HOSTNAME = "http://localhost:3000";
 const UPDATE_INVENTORY_ROUTE = "/account/inventory/extension/update";
 const INVENTORY_HISTORY_ROUTE = "/account/inventory/extension/history";
+
+
 
 console.log("background loaded");
 chrome.runtime.onMessage.addListener(
@@ -46,35 +55,50 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (isStartInventoryHistoryPayload(msg)) {
-      console.log("START INVENTORY HISTORY SYNC RECEIVED");
-
-      const granted = await hasPermission([], ["https://steamcommunity.com/*"]);
-
-      if (!granted) {
-        throw new Error(
-          "must have steamcommunity.com permissions in order to prove API requests"
-        );
-      }
-      await openOffscreenDocument();
-
-      const existingContexts = await chrome.runtime.getContexts({});
-
-      const offscreenDocument = existingContexts.find(
-        (c) => c.contextType === 'OFFSCREEN_DOCUMENT'
-      );
-
-
-      console.log("created offscreen document", offscreenDocument)
-      
-      await chrome.runtime.sendMessage({
-        type: 'load-inventory-history',
-        target: 'offscreen',
-      });
-
-      console.log("Sent 'load-inventory-history' to offscreen")
+      await loadInventoryHistory(msg)
 
       return true;
     }
+
+    if (isLogMessage(msg)) {
+      await appendDevLog(msg.message);
+      return true;
+    }
+
+    if (isUpdateCursor(msg)) {
+      saveHistoryCursor(msg.cursor)
+      return true;
+    }
+
+    if (isAppStateUpdate(msg)) {
+      const { status, statusMessage } = msg;
+      
+      updateStatus(status, statusMessage);
+      return true;
+    }
+
+    if(isOffscreenPayloadMessage(msg)) {
+
+      if (msg.type === 'ADD_APP_SYNCED_TRADEUP_ITEMS') {
+
+        const appState = await getAppState()
+        const newCount = appState.syncedTradeupItems + msg.amount
+
+        await updateSyncedTradeupItems(newCount);
+        return true
+      }
+
+      if (msg.type === 'ADD_APP_SYNCED_STORAGE_UNIT_ITEMS') {
+        // update synced storage unit items count
+        const appState = await getAppState()
+        const newCount = appState.syncedStorageUnitItems + msg.amount
+
+        await updateSyncedStorageUnitItems(newCount);
+        return true
+      }
+
+    }
+
   }
 );
 

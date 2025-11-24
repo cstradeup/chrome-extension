@@ -1,10 +1,18 @@
+const colors = require("tailwindcss/colors");
+
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
     "./src/**/*.{html,ts}"   // scan popup.html, other HTML + TS files
   ],
   theme: {
-    extend: {}
+    colors,
+    fontFamily: {
+      sans: ["Graphik", "sans-serif"],
+      serif: ["Merriweather", "serif"],
+    },
+    extend: {},
   },
-  plugins: []
+  plugins: [require("daisyui")]
 };

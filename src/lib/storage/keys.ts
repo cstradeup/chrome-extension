@@ -9,14 +9,13 @@ export interface SerializedFilter {
 
 
 export enum StorageKey {
-    // Backwards compatible with <3.0.0
-    PAGE_SIZE = 'pageSize',
-    ITEM_FILTERS = 'expressions',
-    GLOBAL_FILTERS = 'global',
-    ACCESS_TOKEN = 'access_token',
-    LAST_TRADE_PING_ATTEMPT = 'last_trade_ping_attempt',
-    LAST_TRADE_BLOCKED_PING_ATTEMPT = 'last_trade_blocked_ping_attempt',
-    PRICE_CACHE = 'price_cache', // Stores market hash name -> price mapping (~0.86MB)
+    STEAM_ACCESS_TOKEN = 'steam_access_token',
+    CSTRADEUP_ACCESS_TOKEN = 'cstradeup_access_token',
+    HISTORY_UPDATE_CURSOR = 'history_update_cursor',
+    LAST_UPDATE_INVENTORY_DATE = 'last_update_inventory_date',
+    LAST_UPDATE_HISTORY_DATE = 'last_update_history_date',
+    DEV_LOGS = 'dev_logs',
+    APP_STATE = 'app_state',
 }
 
 export type DynamicStorageKey = string;
@@ -46,15 +45,3 @@ function newDynamicRow<T>(suffix: StorageKey): (prefix: string) => StorageRow<T>
         return {key: `${prefix}_${suffix}`} as StorageRow<T>;
     };
 }
-
-// Explicitly create each row here that is used in the application
-// This is designed to have type safety for all operations on the same key
-export const PAGE_SIZE = newRow<number>(StorageKey.PAGE_SIZE);
-// Dynamic prefixes should be the market hash name of the item
-export const DYNAMIC_ITEM_FILTERS = newDynamicRow<SerializedFilter[]>(StorageKey.ITEM_FILTERS);
-export const GLOBAL_FILTERS = newRow<SerializedFilter[]>(StorageKey.GLOBAL_FILTERS);
-export const PRICE_CACHE = newRow<{
-    lastUpdated: number;
-    prices: Record<string, number>;
-    dopplerPrices?: Record<string, Record<number, number>>;
-}>(StorageKey.PRICE_CACHE);

@@ -20,6 +20,7 @@ specifiers:
   comlink: ^4.4.2
   copy-webpack-plugin: ^11.0.0
   css-loader: ^6.7.3
+  daisyui: ^5.5.5
   esbuild: ^0.25.12
   esbuild-plugin-polyfill-node: ^0.3.0
   file-loader: ^6.2.0
@@ -67,6 +68,7 @@ devDependencies:
   clean-webpack-plugin: 4.0.0_webpack@5.102.1
   copy-webpack-plugin: 11.0.0_webpack@5.102.1
   css-loader: 6.11.0_webpack@5.102.1
+  daisyui: 5.5.5
   esbuild: 0.25.12
   esbuild-plugin-polyfill-node: 0.3.0_esbuild@0.25.12
   file-loader: 6.2.0_webpack@5.102.1
@@ -2577,6 +2579,10 @@ packages:
 
   /csstype/3.2.1:
     resolution: {integrity: sha512-98XGutrXoh75MlgLihlNxAGbUuFQc7l1cqcnEZlLNKc0UrVdPndgmaDmYTDDh929VS/eqTZV0rozmhu2qqT1/g==}
+    dev: true
+
+  /daisyui/5.5.5:
+    resolution: {integrity: sha512-ekvI93ZkWIJoCOtDl0D2QMxnWvTejk9V5nWBqRv+7t0xjiBXqAK5U6o6JE2RPvlIC3EqwNyUoIZSdHX9MZK3nw==}
     dev: true
 
   /dashdash/1.14.1:

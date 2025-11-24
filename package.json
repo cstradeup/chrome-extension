@@ -16,7 +16,7 @@
         "build:css": "tailwindcss -i src/styles/tailwind.css -o styles.css --minify",
         "build": "npm run clean && npm run build:ts && npm run build:css && node esbuild.config.js && node ./scripts/copy-static.js",
         "watch:css": "tailwindcss -i src/styles/tailwind.css -o styles.css --watch",
-        "build:webpack": "NODE_ENV=production webpack --config webpack.config.js"
+        "build:webpack": "npm run build:css && NODE_ENV=production webpack --config webpack.config.js"
     },
     "homepage": "https://github.com/cstradeup/extension#readme",
     "devDependencies": {
@@ -38,6 +38,7 @@
         "clean-webpack-plugin": "^4.0.0",
         "copy-webpack-plugin": "^11.0.0",
         "css-loader": "^6.7.3",
+        "daisyui": "^5.5.5",
         "esbuild": "^0.25.12",
         "esbuild-plugin-polyfill-node": "^0.3.0",
         "file-loader": "^6.2.0",

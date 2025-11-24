@@ -42,3 +42,27 @@ export function timeDifference(current: number, previous: number) {
   }
 
 }
+
+export function getCookie(cname: string) {
+  const name = cname + "=";
+  const decodedCookie = decodeURIComponent(document.cookie);
+  const ca = decodedCookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    if (c.indexOf(name) === 0) return c.substring(name.length, c.length);
+  }
+  return null;
+}
+
+export async function isRunningOffscreen() {
+  const existingContexts = await chrome.runtime.getContexts({});
+
+  console.log('existingContexts', existingContexts);
+
+  const offscreenDocument = existingContexts.find(
+    (c) => c.contextType === 'OFFSCREEN_DOCUMENT'
+  );
+
+  return offscreenDocument !== undefined;
+}

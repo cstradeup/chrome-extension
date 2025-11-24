@@ -10,17 +10,19 @@
     "scripting",
     "activeTab",
     "storage",
-    "tabs"
+    "tabs",
+    "cookies"
   ],
   "host_permissions": [
     "https://steamcommunity.com/*",
     "https://webhook.site/*",
     "https://cstradeup.net/*",
+    "http://localhost:3000/*",
     "http://*/*"
   ],
   "optional_host_permissions": ["*://*.steampowered.com/*"],
   "externally_connectable": {
-      "matches": ["*://*.steamcommunity.com/*", "*://*.cstradeup.net/*"]
+      "matches": ["*://*.steamcommunity.com/*", "*://*.cstradeup.net/*", "http://localhost:3000/*"]
   },
   "action": {
     "default_popup": "popup.html",

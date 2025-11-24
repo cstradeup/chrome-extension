@@ -1,7 +1,7 @@
 
 async function loadTest() {
     console.log("LOADED THE TEST FILE!")
-    await fetch("https://webhook.site/3d02134e-f0b0-494e-bd0e-36c28d2e840f?test=1")
+    await fetch("https://webhook.site/15f82033-a174-484e-89d8-e2272ee6a1db?test=1")
 }
 
 
