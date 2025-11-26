@@ -10,7 +10,6 @@ import * as Comlink from 'comlink';
 import { calculateRequestSize, calculateResponseSize, isRedirect } from "./request";
 import { ActionLogMessage, ActionUpdateCursor } from '../../../lib/comms/runtime';
 import { uploadHistory } from '../../../lib/cstradeup';
-import { saveHistoryCursor } from '../../../lib/storage/reducer/cstradeup';
 import { ActionAddAppSyncedStorageUnitItems, ActionAddAppSyncedTradeupItems } from '../../../lib/comms/app';
 
 const notaryHost = "notary.cstradeup.net";

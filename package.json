@@ -1,7 +1,7 @@
 {
     "name": "cstradeup-extention",
     "version": "0.1.0",
-    "description": "Analyze your CS2 inventory for profitable trade ups. Investment Inventory Insights. View hidden skins on steam inventory.",
+    "description": "Analyze your CS2 inventory for profitable trade ups. View hidden skins in your Storage Units and other inventory insights.",
     "main": ".eslintrc",
     "directories": {
         "lib": "src/lib"

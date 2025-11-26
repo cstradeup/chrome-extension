@@ -92,15 +92,10 @@
           <label class="text-[9px]">Last Updated:</label>
           <span class="text-[9px]" id="inventory_last_updated">Never</span>
         </div>
-
-
-        <div class="flex justify-center items-center">
-          <div id="status" class=" text-sm"></div>
-        </div>
         
       </div>
 
-      <div class="flex flex-col gap-1 p-2 rounded bg-slate-300 w-full">
+      <div class="flex flex-col gap-2 p-2 rounded bg-slate-300 w-full">
 
         <button
           id="start_inventory_history"
@@ -109,17 +104,20 @@
           Load Inventory History
         </button>
 
-        <div>
-          <label class="text-[9px]" >Last Updated:</label>
-          <span class="text-[9px]" id="inventory_history_last_updated">Never</span>
-        </div>
+        <div class="flex flex-col gap-0.5">
+          <div>
+            <label class="text-[9px]" >Last Updated:</label>
+            <span class="text-[9px]" id="inventory_history_last_updated">Never</span>
+          </div>
 
-        <div class="flex justify-center items-center">
-          <div
-            id="status_inventory_history"
-            class="text-sm"
-          ></div>
+          <hr class="my-2 border-gray-500" />
+
+          <div>
+            <label class="text-[9px]" >Last Entry:</label>
+            <span class="text-[9px]" id="inventory_history_updated_until">Never</span>
+          </div>  
         </div>
+        
 
       </div>
     </div>
@@ -136,13 +134,13 @@
       <span id="app_status_message" class="text-xs"></span>
     </div>
 
-    <div id="login_cstradeup" class="hidden absolute bottom-2 left-2">
+    <div id="login_cstradeup" class="hidden absolute popedup flex flex-col gap-1 p-2 bg-gray-700 rounded">
       <a href="http://localhost:3000/auth/steam" target="_blank"
         >Login to CSTradeUp</a
       >
     </div>
 
-    <div id="login_steam" class="hidden absolute bottom-2 right-2">
+    <div id="login_steam" class="hidden absolute popedup flex flex-col gap-1 p-2 bg-gray-700 rounded">
       <a href="https://steamcommunity.com/login/home/?goto=%2F" target="_blank"
         >Login to Steam</a
       >

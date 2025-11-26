@@ -12,7 +12,7 @@ import {
 } from "./lib/storage/reducer/cstradeup";
 import { isRunningOffscreen, timeDifference } from "./lib/utils";
 import { getDevLogs } from "./lib/storage/reducer/logs";
-import { getAppState, updateStatus } from "./lib/storage/reducer/app";
+import { getAppState, updateStatus, updateSyncedInventoryItems } from "./lib/storage/reducer/app";
 
 const APP_ID = "730";
 
@@ -22,10 +22,14 @@ const apiUrl = `${HOSTNAME}${UPADTE_INVENTORY_ROUTE}`;
 const pairs = `${APP_ID}:2,${APP_ID}:16`;
 
 async function LoadInterceptedInventory() {
-  const tab = await findSteamTab();
+
+  const steamData = await getStore();
+
+  const tab = await findSteamTab(`https://steamcommunity.com/${steamData?.profile_part}/inventory#${APP_ID}`);
 
   if (!tab || !tab.id) {
     // !!! masive error, no tab, not inventory page
+    console.error("No Steam tab found or tab ID is missing.");
     return false;
   }
 
@@ -39,26 +43,29 @@ async function LoadInterceptedInventory() {
   });
 
   if (!dataResults.result) {
+    console.error("No inventory data found in the Steam tab.");
     return false;
   }
-  console.log("dataResults.result", dataResults.result);
+
+  const itemCount = Object.keys(dataResults.result).reduce(
+    (acc, key) => acc + dataResults?.result?.[key].assets.length, // TODO: take in account quantity
+    0
+  );
 
   const steamId = findSteamID();
   if (steamId) await ActionPostApi(steamId, dataResults.result as any);
+
+  updateSyncedInventoryItems(itemCount);
 
   return true;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const lastUpdatedEl = document.getElementById("lastUpdated");
-  const statusEl = document.getElementById("status");
   const startBtn = document.getElementById("start");
   const startInventoryHistoryBtn = document.getElementById(
     "start_inventory_history"
   );
-  const statusInventoryHistoryEl = document.getElementById(
-    "status_inventory_history"
-  );
+
   const nukeStorageBtn = document.getElementById("nuke_storage");
 
   const logsEl = document.getElementById("logs");
@@ -72,10 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const closeDevtoolsBtn = document.getElementById("close_devtools");
 
-  const totalItemsEl = document.getElementById("total_items");
-  const tradeupItemsEl = document.getElementById("tradeup_items");
-  const storeageUnitItemsEl = document.getElementById("storeage_unit_items");
-  
+
   closeDevtoolsBtn?.addEventListener("click", () => {
       devtoolsModal && (devtoolsModal.style.display = 'none');
   });
@@ -100,7 +104,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   nukeStorageBtn?.addEventListener("click", async () => {
     await chrome.storage.local.clear();
-    alert("Storage cleared");
   });
 
   
@@ -109,36 +112,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const tab = await findOrCreateSteamTab();
 
       if (!tab || !tab.id) {
-        // !!! masive error, no tab
         return;
       }
 
-      if (await LoadInterceptedInventory()) {
-        return;
-      }
-
-      chrome.tabs.sendMessage(
-        tab.id,
-        {
-          type: "START_CRAWL",
-          apiUrl,
-          pairs,
-        },
-        (response) => {
-          if (!statusEl) return;
-
-          if (chrome.runtime.lastError) {
-            statusEl.textContent =
-              "No content script in this tab or not a Steam page.";
-            return;
-          }
-          statusEl.textContent = response?.message || "Started.";
-          
-          if (response?.summary) {
-            console.log("Crawl summary:", response.summary);
-          }
-        }
-      );
+      await LoadInterceptedInventory();
     });
 
   startInventoryHistoryBtn &&
@@ -147,18 +124,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const steamData = await getStore()
       const cstradeupSteamData = await cstradeupAccessToken()
       
-      statusInventoryHistoryEl &&
-        (statusInventoryHistoryEl.textContent =
-          "Starting inventory history sync");
-
       cstradeupSteamData && steamData && await ActionStartInventoryHistorySync(
-        steamData.steam_id,
-        steamData.token,
+        steamData.steam_id ?? null,
+        steamData.token ?? null,
         cstradeupSteamData.auth ?? null,
       );
 
-      statusInventoryHistoryEl &&
-        (statusInventoryHistoryEl.textContent = "Inventory history synced");
     });
 
   LoadInterceptedInventory();
@@ -167,12 +138,44 @@ document.addEventListener("DOMContentLoaded", () => {
 async function loadAppStatus() {
   const statusEl = document.getElementById("app_status");
   const statusMessageEl = document.getElementById("app_status_message");
+  const inventoryLastUpdatedEl = document.getElementById("inventory_last_updated");
+  const inventoryHistoryLastUpdatedEl = document.getElementById("inventory_history_last_updated");
+  const inventoryHistoryupdatedUntilEl = document.getElementById("inventory_history_updated_until");
+  
   const appState = await getAppState();
+  const cstradeupSteamData = await cstradeupAccessToken()
+  
 
   if (statusEl && appState) {
     statusEl.textContent = appState.status;
     statusMessageEl && (statusMessageEl.textContent = appState.statusMessage);
   }
+
+  if (inventoryLastUpdatedEl && appState.lastInventoryUpdate) {
+    inventoryLastUpdatedEl.textContent = timeDifference(Date.now(), appState.lastInventoryUpdate);
+  }
+
+  if (inventoryHistoryLastUpdatedEl && appState.lastHistoryUpdate) {
+    inventoryHistoryLastUpdatedEl.textContent = timeDifference(Date.now(), appState.lastHistoryUpdate);
+  }
+
+  if (inventoryHistoryupdatedUntilEl && cstradeupSteamData?.history_cursor) {
+    // add to inventoryHistoryupdatedUntilEl.textContent the converted unix timestamp from cstradeupSteamData.history_cursor.time
+    const cursorTime = cstradeupSteamData.history_cursor.time;
+    inventoryHistoryupdatedUntilEl.textContent = new Date(cursorTime * 1000).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      /* hour: '2-digit',
+      minute: '2-digit',
+      hour12: true */
+    });
+
+
+  }
+
+
+
 }
 
 async function updateStatusCounts() {
@@ -200,7 +203,7 @@ async function loadDevLogs() {
 
   getDevLogs().then((devLogs) => {
       if (logsEl && devLogs) {
-        logsEl.textContent = devLogs.logs
+        const formatedLogs = devLogs.logs
           .map(
             (entry) =>
               `[${new Date(entry.timestamp).toLocaleTimeString()}] ${
@@ -208,7 +211,12 @@ async function loadDevLogs() {
               }`
           )
           .join("\n");
-          logsEl.scrollTop = logsEl.scrollHeight;
+
+
+          if (formatedLogs !== logsEl.textContent) {
+            logsEl.textContent = formatedLogs;
+            logsEl.scrollTop = logsEl.scrollHeight;
+          }
       }
     });
 }
@@ -221,7 +229,8 @@ async function loadDevStoreData() {
     if (debugEl) {
       debugEl.textContent = `steam_access_token: ${steamData ? steamData.token : 'not set'}
 steam_id: ${steamData ? steamData.steam_id : 'not set'}
-cstradeup_access_token: ${cstradeupSteamData ? cstradeupSteamData.auth : 'not set'}`;
+cstradeup_access_token: ${cstradeupSteamData ? cstradeupSteamData.auth : 'not set'}
+profile_part: ${steamData ? steamData.profile_part : 'not set'}`;
     }
 }
 

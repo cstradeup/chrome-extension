@@ -120,3 +120,18 @@ export async function findOrCreateSteamTab(url:string = `https://steamcommunity.
     }, 100);
   });
 }
+
+export function getProfileUrlPart(): string | null {
+  try {
+    const parts = location.pathname.split("/").filter(Boolean);
+
+    // Expected: ["id", "xxx", ...] or ["profiles", "123", ...]
+    if ((parts[0] === "id" || parts[0] === "profiles") && parts[1]) {
+      return `${parts[0]}/${parts[1]}`;
+    }
+
+    return null; // Not a valid profile URL
+  } catch {
+    return null; // Invalid URL format
+  }
+}

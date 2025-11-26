@@ -1,6 +1,12 @@
 import {gStore} from '../../storage/store';
 import {StorageKey} from '../../storage/keys';
 
+export const DEFAULT_CURSOR: Cursor = {
+    time: 0,
+    time_frac: 0,
+    s: '0',
+}
+
 export type Cursor = {
   time: number,
   time_frac: number,

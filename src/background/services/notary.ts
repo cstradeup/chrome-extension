@@ -2,14 +2,14 @@ import { StartInventoryHistoryPayload } from "../../lib/app";
 import { ActionLogMessage, ActionUpdateAppState } from "../../lib/comms/runtime";
 import { getHistoryCursor } from "../../lib/cstradeup";
 import { hasPermission } from "../../lib/permission";
-import { Cursor } from "../../lib/storage/reducer/cstradeup";
+import { Cursor, DEFAULT_CURSOR } from "../../lib/storage/reducer/cstradeup";
 import { openOffscreenDocument } from "../service-worker";
 
 export async function loadInventoryHistory(msg: StartInventoryHistoryPayload) {
   await ActionLogMessage(`Loading inventory history for steamId ${msg.steamId}`);
 
   const savedCursors = await getHistoryCursor(msg.auth);
-  let startCursor = savedCursors?.last_cursor ?? null;
+  let startCursor: Cursor | null = DEFAULT_CURSOR;
 
   await ActionLogMessage(`Using cursor: ${JSON.stringify(savedCursors)}`);
 

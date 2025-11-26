@@ -41,19 +41,6 @@ chrome.runtime.onMessage.addListener(
       return true; // async
     }
 
-    if (isInventoryPayload(msg)) {
-      /* postToApi(INVENTORY_HISTORY_ROUTE,{ payload: msg.payload,})
-      .then(res => {
-        sendResponse({ ok: true, status: res.status });
-      })
-      .catch(err => {
-        console.error('POST error', err);
-        sendResponse({ ok: false, error: err.message });
-      });
-    return true; // async */
-      openOffscreenDocument();
-    }
-
     if (isStartInventoryHistoryPayload(msg)) {
       await loadInventoryHistory(msg)
 

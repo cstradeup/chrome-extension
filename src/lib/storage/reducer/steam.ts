@@ -2,9 +2,10 @@ import {gStore} from '../../storage/store';
 import {StorageKey} from '../../storage/keys';
 
 export interface SteamStore {
-    token: string;
-    steam_id: string | null;
-    updated_at: number;
+    token?: string;
+    steam_id?: string | null;
+    updated_at?: number;
+    profile_part?: string | null;
 }
 
 
@@ -45,6 +46,16 @@ export async function saveAccessToken(token: string, steamID: string | null): Pr
         steam_id: steamID,
         updated_at: Date.now(),
     } as SteamStore);
+}
+
+export async function updateProfilePart(profilePart: string | null): Promise<void> {
+    const oldStore = await getStore()
+
+    // Explicitly use local storage to prevent issues with sync storage quota or connectivity issues
+    return gStore.setWithStorage<SteamStore>(chrome.storage.local, StorageKey.STEAM_ACCESS_TOKEN, {
+        ...oldStore,
+        profile_part: profilePart,
+    });
 }
 
 export function clearAccessTokenFromStorage(): Promise<void> {

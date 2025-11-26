@@ -45,34 +45,17 @@ export async function updateStatus(status: AppState['status'], message: string):
     return saveAppState(newState);
 }
 
-export async function updateLastInventoryUpdate(timestamp: number): Promise<void> {
-    const oldState = await getAppState();
-
-    const newState: AppState = {
-        ...oldState,
-        lastInventoryUpdate: timestamp,
-    };
-
-    return saveAppState(newState);
-}
-
-export async function updateLastHistoryUpdate(timestamp: number): Promise<void> {
-    const oldState = await getAppState();
-
-    const newState: AppState = {
-        ...oldState,
-        lastHistoryUpdate: timestamp,
-    };
-
-    return saveAppState(newState);
-}
-
 export async function updateSyncedInventoryItems(count: number): Promise<void> {
+    if (isNaN(count) || count < 0) {
+        throw new Error('Invalid count for synced inventory items');
+    }
+
     const oldState = await getAppState();
 
     const newState: AppState = {
         ...oldState,
         syncedInventoryItems: count,
+        lastInventoryUpdate: Date.now(),
     };
 
     return saveAppState(newState);
@@ -84,6 +67,7 @@ export async function updateSyncedTradeupItems(count: number): Promise<void> {
     const newState: AppState = {
         ...oldState,
         syncedTradeupItems: count,
+        lastHistoryUpdate: Date.now(),
     };
 
     return saveAppState(newState);

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "CSTradeUp Inventory Helper",
   "version": "0.1.0",
-  "description": "Analyze your CS2 inventory for profitable trade ups.",
+  "description": "Analyze your CS2 inventory for profitable trade ups. View hidden skins in your Storage Units and other inventory insights.",
   "permissions": [
     "alarms",
     "declarativeNetRequestWithHostAccess",

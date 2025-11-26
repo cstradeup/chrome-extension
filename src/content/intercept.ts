@@ -141,15 +141,16 @@ function setIntercept(): void {
 // Auto-install
 setIntercept();
 
+document.addEventListener("DOMContentLoaded", () => {
+  setTimeout(() => {
+    if(windowProxy.__steamInventoryData){
+      const steamId = findSteamID()
 
-setTimeout(() => {
-  if(windowProxy.__steamInventoryData){
-    const steamId = findSteamID()
-
-    if (steamId){
-      console.log("Calling the content_script from interceptor to user: ", steamId, " inventory contexts: ", windowProxy.__steamInventoryData)
-      
-      ActionPostApi(steamId, windowProxy.__steamInventoryData)
+      if (steamId){
+        console.log("Calling the content_script from interceptor to user: ", steamId, " inventory contexts: ", windowProxy.__steamInventoryData)
+        
+        ActionPostApi(steamId, windowProxy.__steamInventoryData)
+      }
     }
-  }
-}, 2000)
+  }, 2000)
+});
