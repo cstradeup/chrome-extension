@@ -11,6 +11,7 @@ import { calculateRequestSize, calculateResponseSize, isRedirect } from "./reque
 import { ActionLogMessage, ActionUpdateCursor } from '../../../lib/comms/runtime';
 import { uploadHistory } from '../../../lib/cstradeup';
 import { ActionAddAppSyncedStorageUnitItems, ActionAddAppSyncedTradeupItems } from '../../../lib/comms/app';
+import { sleep, withTimeout } from '../../../lib/utils';
 
 const notaryHost = "notary.cstradeup.net";
 const wsRoute = `wss://${notaryHost}/ws`
@@ -46,9 +47,9 @@ export const initThreads = async () => {
 };
 
 export async function notarizeSteamRequestAndSendToBackend(
-  steamId: string = '76561199557640798', 
-  cookie: string = "steamLoginSecure=76561199557640798%7C%7CeyAidHlwIjogIkpXVCIsICJhbGciOiAiRWREU0EiIH0.eyAiaXNzIjogInI6MDAwRV8yNkVDRjI5NV80RDlDRCIsICJzdWIiOiAiNzY1NjExOTk1NTc2NDA3OTgiLCAiYXVkIjogWyAid2ViOmNvbW11bml0eSIgXSwgImV4cCI6IDE3NjM2Mzc3NjgsICJuYmYiOiAxNzU0OTEwMjgwLCAiaWF0IjogMTc2MzU1MDI4MCwgImp0aSI6ICIwMDE1XzI3NDZBMUY3XzQ3RDJDIiwgIm9hdCI6IDE3NTc2NjcwODQsICJydF9leHAiOiAxNzc1OTU2NzIwLCAicGVyIjogMCwgImlwX3N1YmplY3QiOiAiNS4yNDkuMTcuMTY0IiwgImlwX2NvbmZpcm1lciI6ICI1LjI0OS4xNy4xNjQiIH0.FGqsPj5rj-N1dQ1CaSMucERuHlFuwQmNqyNgLeZoeG9d3gDD_3mjPaVN77Zr5RojW010lqJxQ6MK3qdGl2HLBg", 
-  auth: string = "",
+  steamId: string, 
+  cookie: string, 
+  auth: string,
   requestParams: Record<string, string> = DEFAULT_PARAMS
 ) {
   // build the fetch URL exactly as the browser will use

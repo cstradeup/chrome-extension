@@ -66,3 +66,15 @@ export async function isRunningOffscreen() {
 
   return offscreenDocument !== undefined;
 }
+
+export function withTimeout<T>(p: Promise<T>, ms: number, message?: string): Promise<T> {
+  let id: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    id = setTimeout(() => reject(new Error(message ?? `Timeout after ${ms}ms`)), ms);
+  });
+  return Promise.race([p.then((v) => { clearTimeout(id); return v; }), timeout]);
+}
+
+export function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

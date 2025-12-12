@@ -105,66 +105,36 @@ const OFFSCREEN_DOCUMENT_PATH =
 let creating: Promise<void> | null = null;
 
 export async function openOffscreenDocument(): Promise<void> {
-  const existingContexts = await chrome.runtime.getContexts({});
+    const offscreenUrl = chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH);
+    const hasExistingContext = await chrome.offscreen.hasDocument();
 
-  const offscreenDocument = existingContexts.find(
-    (c) => c.contextType === 'OFFSCREEN_DOCUMENT'
-  );
+    if (hasExistingContext) {
+        return;
+    }
 
-   if (!offscreenDocument && !creating) {
-    // Create an offscreen document.
-    creating = chrome.offscreen.createDocument({
-      url: OFFSCREEN_DOCUMENT_PATH,
-      reasons: ['WORKERS'],
-      justification: 'Create offscreen document for inventory history processing',
-    });
-  }
+    if (creating) {
+        await creating;
+    } else {
+        creating = (async () => {
+            const ready = new Promise<void>((resolve) => {
+                const listener = (request: any, sender: chrome.runtime.MessageSender) => {
+                    if (request?.type === 'offscreen_ready' && sender.url === offscreenUrl) {
+                        chrome.runtime.onMessage.removeListener(listener);
+                        resolve();
+                    }
+                };
+                chrome.runtime.onMessage.addListener(listener);
+            });
 
-  if (creating) {
-    await creating;
-    creating = null;
-  }
+            await chrome.offscreen.createDocument({
+                url: OFFSCREEN_DOCUMENT_PATH,
+                reasons: [chrome.offscreen.Reason.WORKERS],
+                justification: 'Workers for multi-threading',
+            });
 
-  /* const offscreenUrl = chrome.runtime.getURL(
-    LOAD_INVENTORY_HISTORY_DOCUMENT_PATH
-  );
-  const hasExistingContext = await chrome.offscreen.hasDocument();
-  if (hasExistingContext) {
-    return;
-  }
-  if (creating) {
-    await creating;
-  } else {
-    creating = (async () => {
-      const ready = new Promise<void>((resolve) => {
-        const listener = (
-          request: any,
-          sender: chrome.runtime.MessageSender
-        ) => {
-          if (
-            request?.type === "offscreen_ready" &&
-            sender.url === offscreenUrl
-          ) {
-            chrome.runtime.onMessage.removeListener(listener);
-            resolve();
-          }
-        };
-        chrome.runtime.onMessage.addListener(listener);
-      });
-      try {
-        await chrome.offscreen.createDocument({
-          url: LOAD_INVENTORY_HISTORY_DOCUMENT_PATH,
-          reasons: [chrome.offscreen.Reason.WORKERS],
-          justification: "LoadInventoryHistory Workers for multi-threading",
-        });
-      } catch (e) {
-        console.error("Failed to create offscreen document", e);
-      }
-
-      await ready;
-      console.log("Offscreen document ready");
-    })();
-    await creating;
-    creating = null;
-  } */
+            await ready;
+        })();
+        await creating;
+        creating = null;
+    }
 }

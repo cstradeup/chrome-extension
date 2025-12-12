@@ -41,7 +41,6 @@ var options = {
     "inject-api": path.join(__dirname, "src", "content", "inject-api.ts"),
     intercept: path.join(__dirname, "src", "content", "intercept.ts"),
     offscreen: path.join(__dirname, "src", "background", "offscreen", "offscreen.ts"),
-    test: path.join(__dirname, "src", "background", "offscreen", "test.ts"),
   },
   // chromeExtensionBoilerplate: {
   //   notHotReload: ["background", "contentScript", "devtools"],
