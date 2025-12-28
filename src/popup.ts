@@ -135,6 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
   LoadInterceptedInventory();
 });
 
+
 async function loadAppStatus() {
   const statusEl = document.getElementById("app_status");
   const statusMessageEl = document.getElementById("app_status_message");
@@ -142,9 +143,26 @@ async function loadAppStatus() {
   const inventoryHistoryLastUpdatedEl = document.getElementById("inventory_history_last_updated");
   const inventoryHistoryupdatedUntilEl = document.getElementById("inventory_history_updated_until");
   
+  const startInventoryHistoryBtn = document.getElementById(
+    "start_inventory_history"
+  ) as HTMLButtonElement;
+  const startBtn = document.getElementById("start") as HTMLButtonElement;
+
   const appState = await getAppState();
   const cstradeupSteamData = await cstradeupAccessToken()
   
+  if (appState.status == 'updating_history') {
+    startInventoryHistoryBtn.disabled = true;
+  } else  {
+    startInventoryHistoryBtn.disabled = false;
+  }
+
+  if (appState.status == 'updating_inventory') {
+    startBtn.disabled = true;
+  } else  {
+    startBtn.disabled = false;
+  }
+
 
   if (statusEl && appState) {
     statusEl.textContent = appState.status;
