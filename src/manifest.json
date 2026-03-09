@@ -1,8 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "CSTradeUp Inventory Helper",
-  "version": "0.1.0",
-  "description": "Analyze your CS2 inventory for profitable trade ups. View hidden skins in your Storage Units and other inventory insights.",
+  "name": "CSTRADEUP Portfolio and Trade Up Helper",
   "permissions": [
     "alarms",
     "declarativeNetRequestWithHostAccess",
@@ -15,7 +13,6 @@
   ],
   "host_permissions": [
     "https://steamcommunity.com/*",
-    "https://webhook.site/*",
     "https://cstradeup.net/*",
     "http://localhost:3000/*",
     "http://*/*"
@@ -26,7 +23,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "CSTradeUp Inventory Helper",
+    "default_title": "CSTRADEUP Portfolio and Trade Up Helper",
     "default_icon": {
       "128": "icon128.png"
     }
@@ -38,7 +35,7 @@
     {
       "matches": ["https://steamcommunity.com/profiles/*","https://steamcommunity.com/id/*"],
       "js": ["content.bundle.js"],
-      "run_at": "document_idle"
+      "run_at": "document_start"
     },
     {
       "matches": ["https://steamcommunity.com/profiles/*", "https://steamcommunity.com/id/*"],
@@ -48,7 +45,13 @@
     },
     {
       "matches": ["https://cstradeup.net/*", "http://localhost:3000/*"],
-      "js": ["inject-api.bundle.js"]
+      "js": ["relay.bundle.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://cstradeup.net/*", "http://localhost:3000/*"],
+      "js": ["inject-api.bundle.js"],
+      "world": "MAIN"
     }
   ],
   "icons": {

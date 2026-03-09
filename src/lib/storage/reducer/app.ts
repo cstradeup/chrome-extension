@@ -1,5 +1,8 @@
 import {gStore} from '../../storage/store';
 import {StorageKey} from '../../storage/keys';
+import {syncBadge} from '../../badge';
+
+export type AppStatus = 'idle' | 'updating_inventory' | 'updating_history' | 'stopping' | 'error' | 'warning';
 
 export interface AppState {
     lastInventoryUpdate: number;
@@ -8,7 +11,9 @@ export interface AppState {
     syncedTradeupItems: number;
     syncedStorageUnitItems: number;
     statusMessage: string;
-    status: 'idle' | 'updating_inventory' | 'updating_history' | 'error';
+    status: AppStatus;
+    operationStartedAt: number;
+    notarizedTradeupItems: number;
 }
 
 const DEFAULT_APP_STATE: AppState = {
@@ -19,6 +24,8 @@ const DEFAULT_APP_STATE: AppState = {
     syncedStorageUnitItems: 0,
     statusMessage: 'Idle',
     status: 'idle',
+    operationStartedAt: 0,
+    notarizedTradeupItems: 0,
 };
 
 export async function getAppState(): Promise<AppState> {
@@ -36,12 +43,17 @@ export async function saveAppState(state: AppState): Promise<void> {
 export async function updateStatus(status: AppState['status'], message: string): Promise<void> {
     const oldState = await getAppState();
 
+    const isStarting = oldState.status === 'idle' && status !== 'idle' && status !== 'error';
+    const isStopping = oldState.status !== 'idle' && (status === 'idle' || status === 'error' || status === 'warning');
+
     const newState: AppState = {
         ...oldState,
         status,
         statusMessage: message,
+        operationStartedAt: isStarting ? Date.now() : isStopping ? 0 : oldState.operationStartedAt,
     };
 
+    syncBadge(status);
     return saveAppState(newState);
 }
 
@@ -79,6 +91,17 @@ export async function updateSyncedStorageUnitItems(count: number): Promise<void>
     const newState: AppState = {
         ...oldState,
         syncedStorageUnitItems: count,
+    };
+
+    return saveAppState(newState);
+}
+
+export async function updateNotarizedTradeupItems(count: number): Promise<void> {
+    const oldState = await getAppState();
+
+    const newState: AppState = {
+        ...oldState,
+        notarizedTradeupItems: count,
     };
 
     return saveAppState(newState);

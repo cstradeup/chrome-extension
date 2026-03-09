@@ -1,65 +1,118 @@
 import { PresentationJSON } from "tlsn-js/build/types";
-import { Cursor, getStore } from "./storage/reducer/cstradeup";
+import { Cursor } from "./storage/reducer/cstradeup";
+import { CSTRADEUP_HOSTNAME } from "./env";
 
-const HOSTNAME = "http://localhost:3000";
-const CSTRADEUP_CURSOR_ROUTE = "/account/inventory/extension/history/cursor";
-const CSTRADEUP_UPLOAD_ROUTE = "/account/inventory/extension/history";
+// =============================================================================
+// Configuration
+// =============================================================================
+
+const HOSTNAME = CSTRADEUP_HOSTNAME;
+
+const ROUTES = {
+  cursor: "/account/inventory/extension/history/cursor",
+  upload: "/account/inventory/extension/history",
+  uploadSigned: "/account/inventory/extension/history/signed",
+} as const;
+
+// =============================================================================
+// Types
+// =============================================================================
 
 export type CursorResponse = {
-    last_cursor: Cursor;
-    left_cursor: Cursor | null;
-    right_cursor: Cursor | null;
+  last_cursor: Cursor;
+  left_cursor: Cursor | null;
+  right_cursor: Cursor | null;
+};
+
+export type UploadHistoryResponse = {
+  verified: boolean;
+  crafted: number;
+  moved_to_storage: number;
+};
+
+export type UploadSignedHistoryResponse = {
+  verified: boolean;
+  crafted: number;
+  moved_to_storage: number;
+};
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+function createAuthHeaders(auth: string): HeadersInit {
+  return {
+    "Content-Type": "application/json",
+    Cookie: `auth=${auth}`,
+    Authorization: auth,
+  };
 }
 
-export async function getHistoryCursor(auth: string | null) : Promise<CursorResponse | null> {
+async function postJSON<T>(url: string, auth: string, payload: unknown): Promise<T> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: createAuthHeaders(auth),
+    body: JSON.stringify(payload),
+  });
 
-    if (!auth) {
-        return null;
-    }
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status} ${response.statusText}`);
+  }
 
-    const response = await fetch(`${HOSTNAME}${CSTRADEUP_CURSOR_ROUTE}`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json',
-            Cookie: auth ? `auth=${auth}` : '',
-            Authorization: auth ? `${auth}` : ''
-        },
-    });
-
-    if (!response.ok || response.status !== 200) {
-        throw new Error(`Failed to fetch history cursor: ${response.status} ${response.statusText}`);
-    }
-
-    return await response.json()
+  return response.json();
 }
 
-type UploadHistoryResponse = {
-    verified: boolean;
-    crafted: number;
-    moved_to_storage: number;
+// =============================================================================
+// API Functions
+// =============================================================================
+
+/**
+ * Fetches the current history cursor from the backend.
+ */
+export async function getHistoryCursor(auth: string | null): Promise<CursorResponse | null> {
+  if (!auth) {
+    return null;
+  }
+
+  const response = await fetch(`${HOSTNAME}${ROUTES.cursor}`, {
+    method: "GET",
+    credentials: "include",
+    headers: createAuthHeaders(auth),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch history cursor: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
 }
 
-export async function uploadHistory(presentation: PresentationJSON, auth: string): Promise<UploadHistoryResponse> {
-     
-    const payload = {
-        presentation,
-    };
+/**
+ * Uploads unsigned inventory history to check if notarization is needed.
+ * Returns crafted count - if positive, the request should be notarized.
+ */
+export async function uploadUnsignedHistory(
+  historyData: unknown,
+  auth: string
+): Promise<UploadHistoryResponse> {
+  return postJSON<UploadHistoryResponse>(
+    `${HOSTNAME}${ROUTES.upload}`,
+    auth,
+    historyData
+  );
+}
 
-      // If you are in the background/service worker (recommended), do:
-      const r = await fetch(`${HOSTNAME}${CSTRADEUP_UPLOAD_ROUTE}`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Cookie: `auth=${auth}`,//why no send this? 🤌
-          Authorization: `${auth}`
-        },
-        body: JSON.stringify(payload),
-      });
- 
-      if (!r.ok || r.status !== 200) {
-        throw new Error(`Failed to upload history: ${r.status} ${r.statusText}`);
-      }
-    
-      return await r.json();
+/**
+ * Uploads notarized/signed presentation for verified history.
+ * Only called when crafted items are detected.
+ */
+export async function uploadSignedHistory(
+  presentation: PresentationJSON,
+  auth: string
+): Promise<UploadSignedHistoryResponse> {
+  return postJSON<UploadSignedHistoryResponse>(
+    `${HOSTNAME}${ROUTES.uploadSigned}`,
+    auth,
+    { presentation }
+  );
 }

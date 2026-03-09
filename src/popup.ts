@@ -1,295 +1,252 @@
-import { isLogMessage, MessageType, SteamInventoryDataPayload } from "./lib/app";
-import {
-  ActionInventoryHistory,
-  ActionPostApi,
-  ActionStartInventoryHistorySync,
-} from "./lib/comms/runtime";
-import { findOrCreateSteamTab, findSteamID, findSteamTab } from "./lib/steam";
-import { storeAccessToken, getStore } from "./lib/storage/reducer/steam";
-import {
-  storeAccessToken as cstradeupStoreAccessToken,
-  getStore as cstradeupAccessToken,
-} from "./lib/storage/reducer/cstradeup";
-import { isRunningOffscreen, timeDifference } from "./lib/utils";
-import { getDevLogs } from "./lib/storage/reducer/logs";
-import { getAppState, updateStatus, updateSyncedInventoryItems } from "./lib/storage/reducer/app";
+/**
+ * popup.ts — Slim entry-point for the extension popup.
+ *
+ * Responsibilities:
+ *   1. Read cookies and persist auth tokens
+ *   2. Query DOM elements once
+ *   3. Wire user-action handlers
+ *   4. Subscribe to chrome.storage.onChanged (replaces polling)
+ *   5. Run a single 1-second ticker for elapsed-time display only
+ *
+ * All rendering lives in popup/render.ts, all actions in popup/actions.ts.
+ */
 
-const APP_ID = "730";
+import { StorageKey } from './lib/storage/keys';
+import { getAppState, updateStatus, AppState } from './lib/storage/reducer/app';
+import { clearBadge } from './lib/badge';
+import { getStore as getSteamStore }           from './lib/storage/reducer/steam';
+import { storeAccessToken as storeSteamToken } from './lib/storage/reducer/steam';
+import { getStore as getCstradeupStore }       from './lib/storage/reducer/cstradeup';
+import { storeAccessToken as storeCstradeupToken } from './lib/storage/reducer/cstradeup';
+import { getDevLogs }                          from './lib/storage/reducer/logs';
+import { isRunningOffscreen }                  from './lib/utils';
+import { checkOnboardingState }                from './lib/session';
+import { CSTRADEUP_DOMAIN }                    from './lib/env';
 
-const HOSTNAME = "http://localhost:3000";
-const UPADTE_INVENTORY_ROUTE = "/account/inventory/extension";
-const apiUrl = `${HOSTNAME}${UPADTE_INVENTORY_ROUTE}`;
-const pairs = `${APP_ID}:2,${APP_ID}:16`;
+import { queryElements }                       from './popup/elements';
+import { wireActions }                         from './popup/actions';
+import { renderOnboarding, renderStatus, renderCounts, renderTimestamps, renderElapsed, renderLogs, renderDebug, renderHistoryProgress, renderDevtoolsOptions } from './popup/render';
+import { ActionEnsureMemberSince }             from './lib/comms/runtime';
 
-async function LoadInterceptedInventory() {
+// ---------------------------------------------------------------------------
+// Bootstrap
+// ---------------------------------------------------------------------------
 
-  const steamData = await getStore();
+document.addEventListener('DOMContentLoaded', async () => {
+    const els = queryElements();
 
-  const tab = await findSteamTab(`https://steamcommunity.com/${steamData?.profile_part}/inventory#${APP_ID}`);
+    // 1. Persist auth cookies
+    await persistCookies();
 
-  if (!tab || !tab.id) {
-    // !!! masive error, no tab, not inventory page
-    console.error("No Steam tab found or tab ID is missing.");
-    return false;
-  }
+    // 2. Onboarding gate — block popup until both sessions are active
+    const onboardingState = await checkOnboardingState();
+    renderOnboarding(els, onboardingState);
 
-  const [dataResults] = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    world: "MAIN",
-    func: (): SteamInventoryDataPayload => {
-      const windowProxy: any = window;
-      return windowProxy.__steamInventoryData;
-    },
-  });
+    // Wire recheck buttons (always, even if hidden)
+    wireRecheckButtons(els);
 
-  if (!dataResults.result) {
-    console.error("No inventory data found in the Steam tab.");
-    return false;
-  }
-
-  const itemCount = Object.keys(dataResults.result).reduce(
-    (acc, key) => acc + dataResults?.result?.[key].assets.length, // TODO: take in account quantity
-    0
-  );
-
-  const steamId = findSteamID();
-  if (steamId) await ActionPostApi(steamId, dataResults.result as any);
-
-  updateSyncedInventoryItems(itemCount);
-
-  return true;
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  const startBtn = document.getElementById("start");
-  const startInventoryHistoryBtn = document.getElementById(
-    "start_inventory_history"
-  );
-
-  const nukeStorageBtn = document.getElementById("nuke_storage");
-
-  const logsEl = document.getElementById("logs");
-  const clearLogs = document.getElementById("clear_logs");
-  
-  const debugEl = document.getElementById("debug");
-  const showDebugBtn = document.getElementById("show_debug");
-
-  const openOptionsBtn = document.getElementById("open_options");
-  const devtoolsModal = document.getElementById("devtools");
-
-  const closeDevtoolsBtn = document.getElementById("close_devtools");
-
-
-  closeDevtoolsBtn?.addEventListener("click", () => {
-      devtoolsModal && (devtoolsModal.style.display = 'none');
-  });
-
-  openOptionsBtn?.addEventListener("click", () => {
-      devtoolsModal && (devtoolsModal.style.display = 'block');
-  });
-
-  clearLogs?.addEventListener("click", async () => {
-    
-    if (logsEl) {
-      await chrome.storage.local.remove('dev_logs');
-      logsEl.textContent = '';
-    }
-  });
-
-  showDebugBtn?.addEventListener("click", async () => {
-    if (debugEl) {
-      debugEl.style.display = debugEl.style.display === 'block' ? 'none' : 'block';
-    }
-  });
-
-  nukeStorageBtn?.addEventListener("click", async () => {
-    await chrome.storage.local.clear();
-  });
-
-  
- startBtn &&
-    startBtn.addEventListener("click", async () => {
-      const tab = await findOrCreateSteamTab();
-
-      if (!tab || !tab.id) {
+    if (onboardingState !== 'ready') {
+        // Nothing else to do until sessions are established
         return;
-      }
+    }
 
-      await LoadInterceptedInventory();
-    });
-
-  startInventoryHistoryBtn &&
-    startInventoryHistoryBtn.addEventListener("click", async () => {
-
-      const steamData = await getStore()
-      const cstradeupSteamData = await cstradeupAccessToken()
-      
-      cstradeupSteamData && steamData && await ActionStartInventoryHistorySync(
-        steamData.steam_id ?? null,
-        steamData.token ?? null,
-        cstradeupSteamData.auth ?? null,
-      );
-
-    });
-
-  LoadInterceptedInventory();
+    // 3. Wire user-action handlers
+    // Ensure memberSince is populated every time the popup opens
+    ActionEnsureMemberSince();
+    bootMainContent(els);
 });
 
+// ---------------------------------------------------------------------------
+// Recheck buttons — re-evaluate onboarding after user signs in externally
+// ---------------------------------------------------------------------------
 
-async function loadAppStatus() {
-  const statusEl = document.getElementById("app_status");
-  const statusMessageEl = document.getElementById("app_status_message");
-  const inventoryLastUpdatedEl = document.getElementById("inventory_last_updated");
-  const inventoryHistoryLastUpdatedEl = document.getElementById("inventory_history_last_updated");
-  const inventoryHistoryupdatedUntilEl = document.getElementById("inventory_history_updated_until");
-  
-  const startInventoryHistoryBtn = document.getElementById(
-    "start_inventory_history"
-  ) as HTMLButtonElement;
-  const startBtn = document.getElementById("start") as HTMLButtonElement;
+function wireRecheckButtons(els: ReturnType<typeof queryElements>) {
+    const recheck = async () => {
+        await persistCookies();
+        const state = await checkOnboardingState();
+        renderOnboarding(els, state);
 
-  const appState = await getAppState();
-  const cstradeupSteamData = await cstradeupAccessToken()
-  
-  if (appState.status == 'updating_history') {
-    startInventoryHistoryBtn.disabled = true;
-  } else  {
-    startInventoryHistoryBtn.disabled = false;
-  }
+        if (state === 'ready') {
+            // Ensure the service worker has memberSince for the
+            // now-authenticated Steam user before booting the UI
+            ActionEnsureMemberSince();
+            bootMainContent(els);
+        }
+    };
 
-  if (appState.status == 'updating_inventory') {
-    startBtn.disabled = true;
-  } else  {
-    startBtn.disabled = false;
-  }
+    els.recheckSteam?.addEventListener('click', recheck);
+    els.recheckCstradeup?.addEventListener('click', recheck);
+}
 
+// ---------------------------------------------------------------------------
+// Boot main content — called once when onboarding is complete
+// ---------------------------------------------------------------------------
 
-  if (statusEl && appState) {
-    statusEl.textContent = appState.status;
-    statusMessageEl && (statusMessageEl.textContent = appState.statusMessage);
-  }
+let mainContentBooted = false;
 
-  if (inventoryLastUpdatedEl && appState.lastInventoryUpdate) {
-    inventoryLastUpdatedEl.textContent = timeDifference(Date.now(), appState.lastInventoryUpdate);
-  }
+async function bootMainContent(els: ReturnType<typeof queryElements>) {
+    if (mainContentBooted) return;
+    mainContentBooted = true;
 
-  if (inventoryHistoryLastUpdatedEl && appState.lastHistoryUpdate) {
-    inventoryHistoryLastUpdatedEl.textContent = timeDifference(Date.now(), appState.lastHistoryUpdate);
-  }
+    // 1. Render current state (read-only, no user interaction yet)
+    await fullRender(els);
 
-  if (inventoryHistoryupdatedUntilEl && cstradeupSteamData?.history_cursor) {
-    // add to inventoryHistoryupdatedUntilEl.textContent the converted unix timestamp from cstradeupSteamData.history_cursor.time
-    const cursorTime = cstradeupSteamData.history_cursor.time;
-    inventoryHistoryupdatedUntilEl.textContent = new Date(cursorTime * 1000).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      /* hour: '2-digit',
-      minute: '2-digit',
-      hour12: true */
+    // 2. Attach storage listener so no changes are missed
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local') return;
+        onStorageChanged(els, changes);
     });
 
+    setInterval(() => tickElapsed(els), 1_000);
 
-  }
+    // 3. Idle cleanup — must complete before user can interact.
+    //    If the offscreen document is still alive (e.g. from a
+    //    previous crawl), skip the reset so we don't overwrite
+    //    a legitimately active status.
+    if (!(await isRunningOffscreen())) {
+        await updateStatus('idle', 'Ready');
+    }
 
+    // 4. Wire click handlers LAST — guarantees the listener is
+    //    attached and the idle cleanup is done before the user
+    //    can trigger a new operation (prevents race condition
+    //    where updateStatus('idle') overwrites 'updating_history').
+    wireActions(els);
 
-
-}
-
-async function updateStatusCounts() {
-  const appState = await getAppState();
-
-  const totalItemsEl = document.getElementById("total_items");
-  const tradeupItemsEl = document.getElementById("tradeup_items");
-  const storeageUnitItemsEl = document.getElementById("storeage_unit_items");
-
-  if (totalItemsEl && appState) {
-    totalItemsEl.textContent = appState.syncedInventoryItems?.toString();
-  }
-
-  if (tradeupItemsEl && appState) {
-    tradeupItemsEl.textContent = appState.syncedTradeupItems?.toString();
-  }
-
-  if (storeageUnitItemsEl && appState) {
-    storeageUnitItemsEl.textContent = appState.syncedStorageUnitItems?.toString();
-  }
-}
-
-async function loadDevLogs() {
-  const logsEl = document.getElementById("logs");
-
-  getDevLogs().then((devLogs) => {
-      if (logsEl && devLogs) {
-        const formatedLogs = devLogs.logs
-          .map(
-            (entry) =>
-              `[${new Date(entry.timestamp).toLocaleTimeString()}] ${
-                entry.message
-              }`
-          )
-          .join("\n");
-
-
-          if (formatedLogs !== logsEl.textContent) {
-            logsEl.textContent = formatedLogs;
-            logsEl.scrollTop = logsEl.scrollHeight;
-          }
-      }
-    });
-}
-
-async function loadDevStoreData() {
-  const debugEl = document.getElementById("debug");
-  const steamData = await getStore();
-    const cstradeupSteamData = await cstradeupAccessToken();
-    
-    if (debugEl) {
-      debugEl.textContent = `steam_access_token: ${steamData ? steamData.token : 'not set'}
-steam_id: ${steamData ? steamData.steam_id : 'not set'}
-cstradeup_access_token: ${cstradeupSteamData ? cstradeupSteamData.auth : 'not set'}
-profile_part: ${steamData ? steamData.profile_part : 'not set'}`;
+    // Dismiss terminal-state badges (error / warning) on popup open.
+    // The user can see the full status message in the UI now — no need
+    // to keep the badge flashing at them.
+    const appState = await getAppState();
+    if (appState.status === 'error' || appState.status === 'warning' || appState.status === 'idle') {
+        clearBadge();
     }
 }
 
-(async () => {
-  
- 
-  chrome.cookies.getAll(
-    { domain: "steamcommunity.com", name: "steamLoginSecure" },
-    async (cookies) => {
-      if (cookies.length > 0) {
-        await storeAccessToken(cookies[0].value);
-      }
+// ---------------------------------------------------------------------------
+// Cookie persistence
+// ---------------------------------------------------------------------------
+
+async function persistCookies() {
+    const [steamCookies, cstradeupCookies] = await Promise.all([
+        chrome.cookies.getAll({ domain: 'steamcommunity.com', name: 'steamLoginSecure' }),
+        chrome.cookies.getAll({ domain: CSTRADEUP_DOMAIN, name: 'auth' }),
+    ]);
+
+    if (steamCookies.length > 0)    await storeSteamToken(steamCookies[0].value);
+    if (cstradeupCookies.length > 0) await storeCstradeupToken(cstradeupCookies[0].value);
+}
+
+// ---------------------------------------------------------------------------
+// Full render — called once on boot
+// ---------------------------------------------------------------------------
+
+async function fullRender(els: ReturnType<typeof queryElements>) {
+    const [appState, steamData, cstradeupData, devLogs] = await Promise.all([
+        getAppState(),
+        getSteamStore(),
+        getCstradeupStore(),
+        getDevLogs(),
+    ]);
+
+    renderStatus(els, appState);
+    renderCounts(els, appState);
+    renderTimestamps(els, appState, cstradeupData);
+    renderElapsed(els, appState.operationStartedAt);
+    renderDevtoolsOptions(els, appState);
+    renderHistoryProgress(
+        els,
+        appState.status,
+        cstradeupData,
+        steamData?.memberSince,
+    );
+    renderLogs(els, devLogs);
+    renderDebug(els, steamData as any, cstradeupData as any);
+}
+
+// ---------------------------------------------------------------------------
+// Reactive re-render on storage changes
+// ---------------------------------------------------------------------------
+
+function tryParse<T>(raw: unknown): T | null {
+    if (raw === undefined || raw === null) return null;
+    if (typeof raw === 'string') {
+        try { return JSON.parse(raw) as T; } catch { return raw as T; }
     }
-  );
+    return raw as T;
+}
 
-  chrome.cookies.getAll(
-    { domain: "localhost", name: "auth" },
-    async (cookies) => {
-      if (cookies.length > 0) {
-        await cstradeupStoreAccessToken(cookies[0].value);
-      }
+async function onStorageChanged(
+    els: ReturnType<typeof queryElements>,
+    changes: { [key: string]: chrome.storage.StorageChange },
+) {
+    if (StorageKey.APP_STATE in changes) {
+        const state = tryParse<AppState>(changes[StorageKey.APP_STATE].newValue);
+        if (state) {
+            renderStatus(els, state);
+            renderCounts(els, state);
+            renderDevtoolsOptions(els, state);
+            cachedOperationStartedAt = state.operationStartedAt;
+
+            const cstradeupData = await getCstradeupStore();
+            renderTimestamps(els, state, cstradeupData);
+
+            // Re-render progress whenever status changes (show/hide + update)
+            const steamData = await getSteamStore();
+            renderHistoryProgress(
+                els,
+                state.status,
+                cstradeupData,
+                steamData?.memberSince,
+            );
+        }
     }
-  );
 
+    if (StorageKey.CSTRADEUP_ACCESS_TOKEN in changes) {
+        const cstradeupData = tryParse<any>(changes[StorageKey.CSTRADEUP_ACCESS_TOKEN].newValue);
+        const appState = await getAppState();
+        renderTimestamps(els, appState, cstradeupData);
 
-  await loadDevLogs();
-  await loadDevStoreData();
-  await loadAppStatus();
-  await updateStatusCounts();
-  setInterval(async () => {
+        // Cursor lives inside cstradeup store — re-render progress on every cursor update
+        const steamData = await getSteamStore();
+        renderHistoryProgress(
+            els,
+            appState.status,
+            cstradeupData,
+            steamData?.memberSince,
+        );
+    }
 
-    await loadDevLogs();
-    await loadDevStoreData();
-    await loadAppStatus();
-    await updateStatusCounts();
-  }, 1000);
+    if (StorageKey.DEV_LOGS in changes) {
+        const logs = tryParse<any>(changes[StorageKey.DEV_LOGS].newValue);
+        renderLogs(els, logs);
+    }
 
-  if (!(await isRunningOffscreen())) {
-    await updateStatus("idle", "Time to choose...");
-  }
+    if (StorageKey.STEAM_ACCESS_TOKEN in changes || StorageKey.CSTRADEUP_ACCESS_TOKEN in changes) {
+        const [steamData, cstradeupData] = await Promise.all([
+            getSteamStore(),
+            getCstradeupStore(),
+        ]);
+        renderDebug(els, steamData as any, cstradeupData as any);
 
-  console.log("Popup initialized", await getAppState());
+        // Re-render progress when steam data changes (memberSince may have
+        // become available after the crawl started).
+        if (StorageKey.STEAM_ACCESS_TOKEN in changes) {
+            const appState = await getAppState();
+            renderHistoryProgress(els, appState.status, cstradeupData, steamData?.memberSince);
+        }
+    }
+}
 
-})();
+// ---------------------------------------------------------------------------
+// Elapsed-time ticker
+// ---------------------------------------------------------------------------
+
+let cachedOperationStartedAt = 0;
+
+async function tickElapsed(els: ReturnType<typeof queryElements>) {
+    if (cachedOperationStartedAt === 0) {
+        const state = await getAppState();
+        cachedOperationStartedAt = state.operationStartedAt;
+    }
+    renderElapsed(els, cachedOperationStartedAt);
+}

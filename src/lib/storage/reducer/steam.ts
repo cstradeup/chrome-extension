@@ -6,6 +6,8 @@ export interface SteamStore {
     steam_id?: string | null;
     updated_at?: number;
     profile_part?: string | null;
+    /** ISO-8601 date string of when the account was created (e.g. '2011-05-21T23:00:00.000Z') */
+    memberSince?: string | null;
 }
 
 
@@ -22,6 +24,15 @@ export async function storeAccessToken(token: string): Promise<void> {
         console.error('failed to save access token to storage', e);
     }
 
+}
+
+export async function saveMemberSince(memberSince: Date | string): Promise<void> {
+    const oldStore = await getStore();
+    const iso = typeof memberSince === 'string' ? memberSince : memberSince.toISOString();
+    return gStore.setWithStorage(chrome.storage.local, StorageKey.STEAM_ACCESS_TOKEN, {
+        ...oldStore,
+        memberSince: iso,
+    } as SteamStore);
 }
 
 function extractSteamID(token: string|null): string | null {

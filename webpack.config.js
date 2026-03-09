@@ -23,6 +23,19 @@ var fileExtensions = [
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
+// Environment-specific config for CSTRADEUP
+const ENV_CONFIG = {
+  development: {
+    HOSTNAME: "http://localhost:3000",
+    DOMAIN: "localhost",
+  },
+  production: {
+    HOSTNAME: "https://cstradeup.net",
+    DOMAIN: "cstradeup.net",
+  },
+};
+const currentEnv = isDevelopment ? ENV_CONFIG.development : ENV_CONFIG.production;
+
 var options = {
   mode: process.env.NODE_ENV || "development",
   ignoreWarnings: [
@@ -39,6 +52,7 @@ var options = {
     "service-worker": path.join(__dirname, "src", "background", "service-worker.ts"),
     content: path.join(__dirname, "src", "content", "content.ts"),
     "inject-api": path.join(__dirname, "src", "content", "inject-api.ts"),
+    relay: path.join(__dirname, "src", "content", "relay.ts"),
     intercept: path.join(__dirname, "src", "content", "intercept.ts"),
     offscreen: path.join(__dirname, "src", "background", "offscreen", "offscreen.ts"),
   },
@@ -120,6 +134,11 @@ var options = {
     new webpack.ProgressPlugin(),
     // expose and write the allowed env vars on the compiled bundle
     new webpack.EnvironmentPlugin(["NODE_ENV"]),
+    new webpack.DefinePlugin({
+      __CSTRADEUP_HOSTNAME__: JSON.stringify(currentEnv.HOSTNAME),
+      __CSTRADEUP_DOMAIN__: JSON.stringify(currentEnv.DOMAIN),
+      __IS_DEV__: JSON.stringify(isDevelopment),
+    }),
     // new ExtReloader({
     //   manifest: path.resolve(__dirname, "src/manifest.json")
     // }),
@@ -131,13 +150,34 @@ var options = {
           force: true,
           transform: function (content, path) {
             // generates the manifest file using the package.json informations
-            return Buffer.from(
-              JSON.stringify({
-                description: process.env.npm_package_description,
-                version: process.env.npm_package_version,
-                ...JSON.parse(content.toString()),
-              })
-            );
+            const manifest = {
+              description: process.env.npm_package_description,
+              version: process.env.npm_package_version,
+              ...JSON.parse(content.toString()),
+            };
+
+            if (!isDevelopment) {
+              // Production: strip localhost patterns from manifest
+              const stripLocalhost = (patterns) =>
+                patterns.filter((p) => !p.includes("localhost") && !p.includes("://*/*"));
+
+              if (manifest.content_scripts) {
+                manifest.content_scripts = manifest.content_scripts.map((cs) => ({
+                  ...cs,
+                  matches: stripLocalhost(cs.matches),
+                }));
+              }
+              if (manifest.host_permissions) {
+                manifest.host_permissions = stripLocalhost(manifest.host_permissions);
+              }
+              if (manifest.externally_connectable?.matches) {
+                manifest.externally_connectable.matches = stripLocalhost(
+                  manifest.externally_connectable.matches
+                );
+              }
+            }
+
+            return Buffer.from(JSON.stringify(manifest, null, 2));
           },
         },
       ],

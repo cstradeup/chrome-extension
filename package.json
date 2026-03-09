@@ -16,7 +16,9 @@
         "build:css": "tailwindcss -i src/styles/tailwind.css -o styles.css --minify",
         "build": "npm run clean && npm run build:ts && npm run build:css && node esbuild.config.js && node ./scripts/copy-static.js",
         "watch:css": "tailwindcss -i src/styles/tailwind.css -o styles.css --watch",
-        "build:webpack": "npm run build:css && NODE_ENV=production webpack --config webpack.config.js"
+        "build:webpack": "npm run build:css && NODE_ENV=production webpack --config webpack.config.js",
+        "build:webpack:dev": "npm run build:css && NODE_ENV=development webpack --config webpack.config.js",
+        "dev": "npm run build:webpack:dev"
     },
     "homepage": "https://github.com/cstradeup/extension#readme",
     "devDependencies": {
@@ -66,5 +68,8 @@
     "dependencies": {
         "comlink": "^4.4.2",
         "tlsn-js": "0.1.0-alpha.12.0"
+    },
+    "overrides": {
+        "tlsn-wasm": "file:/home/unknown/Projects/tlsnotary/tlsn-js/tlsn-wasm/tlsn/crates/wasm/pkg"
     }
 }
