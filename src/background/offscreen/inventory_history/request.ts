@@ -150,7 +150,6 @@ export async function doSteamRequestAndSendToBackend(
   auth: string,
   requestParams: HistoryParams = DEFAULT_HISTORY_PARAMS,
 ): Promise<InventoryHistoryUploadResult> {
-  const cookie = buildCookie(token);
 
   // Step 1: Fetch Steam history using pre-resolved URL
   await ActionLogMessage("Fetching Steam inventory history...");

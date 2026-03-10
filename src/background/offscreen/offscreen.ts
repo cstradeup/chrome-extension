@@ -8,6 +8,7 @@ import {
 } from "../../lib/comms/runtime";
 import { getAccountAge, SteamAccountAge } from "./user/badges";
 import { GetParmsFromCursor, SteamHttpError } from "./inventory_history/helpers";
+import { doSteamRequestAndSendToBackend } from "./inventory_history/request";
 
 // =============================================================================
 // Configuration
@@ -86,7 +87,7 @@ async function handleInventoryHistoryRequest(
   totalProveRequests++;
 
   try {
-    await notarizeSteamRequestAndSendToBackend(
+    await doSteamRequestAndSendToBackend(
       request.profileBaseUrl ?? "",
       request.token ?? "",
       request.auth ?? "",
