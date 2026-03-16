@@ -10,7 +10,7 @@
  *   → chrome.runtime.sendMessage → service-worker.ts
  *   → response → window.postMessage → inject-api.ts (MAIN)
  */
-
+// @ts-ignore
 const CHANNEL = '__CSTRADEUP_API__';
 
 // =============================================================================

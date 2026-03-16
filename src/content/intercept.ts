@@ -12,6 +12,7 @@
  */
 
 const APP_ID = '730';                       // CS2 app id (inline to avoid importing extension modules)
+// @ts-ignore
 const CHANNEL = '__CSTRADEUP_INVENTORY__';  // unique key so no other extension/page collides
 
 const INVENTORY_PATH_SEGMENT = '/inventory/';
