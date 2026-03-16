@@ -16,10 +16,10 @@ export async function ActionAddAppSyncedStorageUnitItems(amount: number) {
     });
 }
 
-export async function ActionAddNotorizedTradeupItems(amount: number) {
+export async function ActionAddNotarizedTradeupItems(amount: number) {
     // Send log message to background
     return new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: 'ADD_NOTORIZED_TRADEUP_ITEMS', amount }, (resp) => {
+        chrome.runtime.sendMessage({ type: 'ADD_NOTARIZED_TRADEUP_ITEMS', amount }, (resp) => {
             resolve(resp);
         });
     });

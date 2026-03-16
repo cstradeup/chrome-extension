@@ -124,7 +124,7 @@ chrome.runtime.onMessage.addListener(
           await updateSyncedStorageUnitItems(newCount);
         }
 
-        if (msg.type === "ADD_NOTORIZED_TRADEUP_ITEMS") {
+        if (msg.type === "ADD_NOTARIZED_TRADEUP_ITEMS") {
           const appState = await getAppState();
           const newCount = appState.notarizedTradeupItems + msg.amount;
           await updateNotarizedTradeupItems(newCount);

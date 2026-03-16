@@ -18,7 +18,7 @@ export type SteamInventoryDataPayload = Record<string, InventoryResponse>;
 
 type TypeMessage = 'POST_TO_API' | 'START_CRAWL' | 'INVENTORY_HISTORY' | 'START_INVENTORY_HISTORY' | 'STOP_OPERATION' | 'LOG_MESSAGE' | 'UPDATE_CURSOR' | 'UPDATE_APP_STATE' | 'ENSURE_MEMBER_SINCE' | 'NOTARIZE_CURSOR' | OffscreenMessage
 
-type OffscreenMessage = 'ADD_APP_SYNCED_TRADEUP_ITEMS' | 'ADD_APP_SYNCED_STORAGE_UNIT_ITEMS' | 'ADD_NOTORIZED_TRADEUP_ITEMS'
+type OffscreenMessage = 'ADD_APP_SYNCED_TRADEUP_ITEMS' | 'ADD_APP_SYNCED_STORAGE_UNIT_ITEMS' | 'ADD_NOTARIZED_TRADEUP_ITEMS'
 
 export type PayloadMessage = {
     type: TypeMessage

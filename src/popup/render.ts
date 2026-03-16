@@ -390,10 +390,17 @@ export function renderLogs(els: Elements, devLogs: DevLogs | null) {
 
 export function renderDebug(els: Elements, steam: Record<string, unknown> | null, cstradeup: Record<string, unknown> | null) {
     if (!els.debug) return;
+
+    const mask = (v: unknown) => {
+        if (!v || typeof v !== 'string') return 'not set';
+        if (v.length <= 8) return '***';
+        return `${v.slice(0, 4)}…${v.slice(-4)}`;
+    };
+
     els.debug.textContent = [
-        `steam_access_token: ${steam?.token ?? 'not set'}`,
+        `steam_access_token: ${mask(steam?.token)}`,
         `steam_id: ${steam?.steam_id ?? 'not set'}`,
-        `cstradeup_access_token: ${cstradeup?.auth ?? 'not set'}`,
+        `cstradeup_access_token: ${mask(cstradeup?.auth)}`,
         `profile_part: ${steam?.profile_part ?? 'not set'}`,
     ].join('\n');
 }

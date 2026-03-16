@@ -12,7 +12,7 @@ export function queryElements() {
         // Stats cards
         totalItems:     el('total_items'),
         tradeupItems:   el('tradeup_items'),
-        storageItems:   el('storeage_unit_items'),
+        storageItems:   el('storage_unit_items'),
 
         // Action buttons
         startBtn:               el<HTMLButtonElement>('start'),

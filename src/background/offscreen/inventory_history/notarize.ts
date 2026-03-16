@@ -12,7 +12,7 @@ import { calculateRequestSize, calculateResponseSize } from "./request";
 import { ActionLogMessage } from "../../../lib/comms/runtime";
 import { uploadSignedHistory } from "../../../lib/cstradeup";
 import {
-  ActionAddNotorizedTradeupItems,
+  ActionAddNotarizedTradeupItems,
 } from "../../../lib/comms/app";
 import { buildCookie, buildHeaders, DEFAULT_HISTORY_PARAMS, HistoryParams, NotarizationResult, STEAM_CONFIG } from "./helpers";
 
@@ -163,7 +163,7 @@ export async function notarizeSteamRequestAndSendToBackend(
     `Signed upload verified: ${signedResult.verified}, crafted: ${signedResult.crafted}, moved_to_storage: ${signedResult.moved_to_storage}`
   );
 
-  await ActionAddNotorizedTradeupItems(signedResult.crafted);
+  await ActionAddNotarizedTradeupItems(signedResult.crafted);
   
   return {
     crafted: signedResult.crafted,

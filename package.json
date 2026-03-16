@@ -1,14 +1,14 @@
 {
-    "name": "cstradeup-extention",
+    "name": "cstradeup-extension",
     "version": "0.1.0",
     "description": "Analyze your CS2 inventory for profitable trade ups. View hidden skins in your Storage Units and other inventory insights.",
-    "main": ".eslintrc",
+    "license": "MIT",
     "directories": {
         "lib": "src/lib"
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/csfloat/extension.git"
+        "url": "git+https://github.com/cstradeup/extension.git"
     },
     "scripts": {
         "clean": "node -e \"require('fs').rmSync('./build', { recursive: true, force: true })\"",
@@ -70,6 +70,5 @@
         "tlsn-js": "0.1.0-alpha.12.0"
     },
     "overrides": {
-        "tlsn-wasm": "file:/home/unknown/Projects/tlsnotary/tlsn-js/tlsn-wasm/tlsn/crates/wasm/pkg"
     }
 }

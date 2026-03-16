@@ -1,4 +1,41 @@
+# Dependency directories
 node_modules/
-dist/
+.pnpm-store/
+
+# Build outputs
 build/
+dist/
+
+# Tailwind generated CSS (rebuilt from source)
+styles.css
+
+# Temporary files
 tmp/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment overrides
+.env
+.env.local
+.env.*.local
+
+# Debug logs
+npm-debug.log*
+pnpm-debug.log*
+
+# Source maps
+*.map
+
+# Extension packaging artifacts
+*.zip
+*.crx
+*.pem

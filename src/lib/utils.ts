@@ -9,13 +9,13 @@ export function timeDifference(current: number, previous: number) {
     return "just now"
   }
 
-  var msPerMinute = 60 * 1000;
-  var msPerHour = msPerMinute * 60;
-  var msPerDay = msPerHour * 24;
-  var msPerMonth = msPerDay * 30;
-  var msPerYear = msPerDay * 365;
+  const msPerMinute = 60 * 1000;
+  const msPerHour = msPerMinute * 60;
+  const msPerDay = msPerHour * 24;
+  const msPerMonth = msPerDay * 30;
+  const msPerYear = msPerDay * 365;
 
-  var elapsed = current - previous;
+  const elapsed = current - previous;
 
   if (elapsed < msPerMinute) {
         return Math.round(elapsed/1000) + ' seconds ago';   
