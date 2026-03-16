@@ -8,6 +8,7 @@ import { Cursor, DEFAULT_CURSOR, isTerminalCursor, normalizeCursor, saveSyncStat
 import { sleep, withTimeout } from "../../lib/utils";
 import { getStore as getSteamStore, saveMemberSince } from "../../lib/storage/reducer/steam";
 import { openOffscreenDocument } from "../service-worker";
+import { ensureLocaleCookies } from "../../lib/session";
 
 // =============================================================================
 // Configuration
@@ -82,17 +83,16 @@ async function resolveSteamProfileUrl(
   token: string
 ): Promise<ResolvedSteamProfile> {
   const profileUrl = `${STEAM_CONFIG.baseUrl}${STEAM_CONFIG.profilePath(steamId)}`;
-  const cookie = `steamLoginSecure=${encodeURIComponent(token)}`;
 
   await ActionLogMessage(`Resolving Steam profile URL for steamId ${steamId}...`);
 
   try {
+    // Locale cookies + steamLoginSecure are already in the cookie jar
+    // (set by ensureLocaleCookies + user's Steam session).
+    // Cookie is a forbidden header in fetch — we must rely on the jar.
     const response = await fetch(profileUrl, {
       method: "HEAD",
       credentials: "include",
-      headers: {
-        Cookie: cookie,
-      },
       redirect: "follow",
     });
 
@@ -192,6 +192,11 @@ export async function loadInventoryHistory(msg: StartInventoryHistoryPayload) {
         await ActionLogMessage(`Could not load account age for progress: ${e}`, 'warn');
       }
     }
+
+    // Override locale cookies in the browser's cookie jar so that both
+    // service-worker and offscreen fetch() calls pick up english / USD / UTC
+    // instead of the user's Steam profile language settings.
+    await ensureLocaleCookies();
 
     // Pre-process: Resolve the actual profile URL once before the cycle
     const profile = await resolveSteamProfileUrl(msg.steamId!, msg.token!);

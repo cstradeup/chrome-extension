@@ -8,7 +8,7 @@ import {
 } from "tlsn-js";
 import * as Comlink from "comlink";
 
-import { calculateRequestSize, calculateResponseSize, fetchSteamHistory } from "./request";
+import { calculateRequestSize, calculateResponseSize } from "./request";
 import { ActionLogMessage } from "../../../lib/comms/runtime";
 import { uploadSignedHistory } from "../../../lib/cstradeup";
 import {

@@ -107,6 +107,10 @@ export async function fetchSteamHistory(
   await ActionLogMessage(`Fetching history from: ${url}`);
 
   // Fetch the history data
+  // NOTE: Cookie header in `headers` is a forbidden header and will be
+  // silently dropped by Chrome.  The browser attaches cookies from the
+  // cookie jar instead (locale overrides are set by ensureLocaleCookies
+  // in the service worker before this offscreen request is dispatched).
   const response = await fetch(url, {
     method: "GET",
     headers,

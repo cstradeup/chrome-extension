@@ -11,7 +11,7 @@
  *   → response → window.postMessage → inject-api.ts (MAIN)
  */
 
-//const CHANNEL = '__CSTRADEUP_API__';
+const CHANNEL = '__CSTRADEUP_API__';
 
 // =============================================================================
 // Types (mirrors inject-api.ts)
@@ -44,6 +44,34 @@ function isApiRequest(d: unknown): d is ApiRequest {
 }
 
 // =============================================================================
+// Extension context helpers
+// =============================================================================
+
+/**
+ * Returns true when the extension context is still alive.
+ * After an extension reload/update, content scripts stay on the page but
+ * chrome.runtime becomes undefined (or chrome.runtime.id disappears).
+ */
+function isExtensionContextValid(): boolean {
+  try {
+    return !!(chrome && chrome.runtime && chrome.runtime.id);
+  } catch {
+    return false;
+  }
+}
+
+/** Send an error response back to inject-api.ts via postMessage. */
+function sendErrorResponse(requestId: number, error: string): void {
+  const errResponse: ApiResponse = {
+    channel: CHANNEL,
+    direction: 'response',
+    requestId,
+    payload: { success: false, error },
+  };
+  window.postMessage(errResponse, '*');
+}
+
+// =============================================================================
 // Action routing
 // =============================================================================
 
@@ -69,21 +97,28 @@ window.addEventListener('message', (event: MessageEvent) => {
   const msg = event.data;
   if (!isApiRequest(msg)) return;
 
+  // Guard: extension context may have been invalidated after a reload/update
+  if (!isExtensionContextValid()) {
+    console.error('[CSTRADEUP relay] Extension context invalidated — please refresh the page.');
+    sendErrorResponse(msg.requestId, 'Extension context invalidated. Please refresh the page.');
+    return;
+  }
+
   const runtimeMsg = buildRuntimeMessage(msg.action, msg.payload);
   if (!runtimeMsg) {
-    // Unknown action — respond immediately with an error
-    const errResponse: ApiResponse = {
-      channel: CHANNEL,
-      direction: 'response',
-      requestId: msg.requestId,
-      payload: { success: false, error: `Unknown action: ${msg.action}` },
-    };
-    window.postMessage(errResponse, '*');
+    sendErrorResponse(msg.requestId, `Unknown action: ${msg.action}`);
     return;
   }
 
   // Forward to service worker and relay the response back
   chrome.runtime.sendMessage(runtimeMsg, (response) => {
+    // Check for messaging errors (e.g. port closed, extension unloaded mid-flight)
+    if (chrome.runtime.lastError) {
+      console.error('[CSTRADEUP relay] runtime.lastError:', chrome.runtime.lastError.message);
+      sendErrorResponse(msg.requestId, chrome.runtime.lastError.message ?? 'Extension messaging error');
+      return;
+    }
+
     const apiResponse: ApiResponse = {
       channel: CHANNEL,
       direction: 'response',

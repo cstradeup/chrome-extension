@@ -82,7 +82,9 @@ const loadInventory = async (...params: any[]) => {
 
 type NotarizeResult = { success: boolean; crafted?: number; error?: string };
 
-const notarizeTradeupItems = async (cursor: Cursor): Promise<NotarizeResult> => {
+// Used by the website to claim trade up's cashback tickets.
+const notarizeTradeupItems = async (cursorJson: string): Promise<NotarizeResult> => {
+  const cursor: Cursor = JSON.parse(cursorJson);
   return sendToRelay<NotarizeResult>('NOTARIZE_CURSOR', cursor);
 }
 

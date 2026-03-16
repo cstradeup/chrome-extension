@@ -102,7 +102,7 @@ async function handleInventoryHistoryRequest(
       );
     }
 
-    return { success: true, shouldShutdown };
+    return { success: true, shouldShutdown: false };
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : String(e);
     const httpStatus = e instanceof SteamHttpError ? e.httpStatus : undefined;
@@ -112,7 +112,7 @@ async function handleInventoryHistoryRequest(
     // would race with the retry logic and overwrite pending warning/retry states.
     await ActionLogMessage(`Offscreen error (HTTP ${httpStatus ?? '?'}): ${errorMsg}`, "error");
 
-    return { success: false, error: errorMsg, shouldShutdown: true, httpStatus };
+    return { success: false, error: errorMsg, shouldShutdown: false, httpStatus };
   }
 }
 

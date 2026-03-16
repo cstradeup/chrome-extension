@@ -39,96 +39,98 @@ console.log("background loaded");
 // Initialize badge to match persisted app state on service worker startup
 getAppState().then(state => syncBadge(state.status));
 chrome.runtime.onMessage.addListener(
-  async (msg: MessageType, sender, sendResponse) => {
+  (msg: MessageType, sender, sendResponse) => {
     console.log("CALLED BACKGROUD!! ", msg);
+
     if (isApiPostPayload(msg)) {
-      const resp = await postToApi(UPDATE_INVENTORY_ROUTE, {
-        steamId: msg.steamId,
-        results: msg.results,
-      });
+      (async () => {
+        try {
+          const resp = await postToApi(UPDATE_INVENTORY_ROUTE, {
+            steamId: msg.steamId,
+            results: msg.results,
+          });
 
-      console.log("API post response:", resp);
+          console.log("API post response:", resp);
 
-      try {
-        const respJson = await resp.json();
-        console.log("API post response JSON:", respJson);
-        if (respJson.total) {
-          await updateSyncedInventoryItems(respJson.total);
+          try {
+            const respJson = await resp.json();
+            console.log("API post response JSON:", respJson);
+            if (respJson.total) {
+              await updateSyncedInventoryItems(respJson.total);
+            }
+          } catch (e) {
+            console.error("Failed to parse API response as JSON:", e);
+          }
+
+          sendResponse({ ok: resp.ok });
+        } catch (e) {
+          console.error("API post error:", e);
+          sendResponse({ ok: false, error: String(e) });
         }
-      } catch (e) {
-        console.error("Failed to parse API response as JSON:", e);
-      }
-
-      sendResponse({ ok: resp.ok });
-
-      return true; // async
+      })();
+      return true; // keep port open for async sendResponse
     }
 
     if (isStartInventoryHistoryPayload(msg)) {
-      await loadInventoryHistory(msg);
-
-      return true;
+      loadInventoryHistory(msg);
+      return; // fire-and-forget, no sendResponse needed
     }
 
     if (isStopOperationPayload(msg)) {
       const stopped = requestStop();
-      await updateStatus("stopping", "Stopping…");
-      sendResponse({ ok: stopped });
-      return true;
+      updateStatus("stopping", "Stopping…").then(() => {
+        sendResponse({ ok: stopped });
+      });
+      return true; // keep port open
     }
 
     if (isLogMessage(msg)) {
-      await appendDevLog(msg.message);
-      return true;
+      appendDevLog(msg.message);
+      return; // fire-and-forget
     }
 
     if (isUpdateCursor(msg)) {
       saveHistoryCursor(msg.cursor);
-      return true;
+      return; // fire-and-forget
     }
 
     if (isAppStateUpdate(msg)) {
       const { status, statusMessage } = msg;
-
       updateStatus(status, statusMessage);
-      return true;
+      return; // fire-and-forget
     }
 
     if (isEnsureMemberSince(msg)) {
       ensureMemberSince().then((ok) => sendResponse({ ok }));
-      return true; // async
+      return true; // keep port open
     }
 
     if (isNotarizeCursorPayload(msg)) {
       handleNotarizeCursor(msg.cursor).then(sendResponse);
-      return true; // async
+      return true; // keep port open
     }
 
     if (isOffscreenPayloadMessage(msg)) {
-      if (msg.type === "ADD_APP_SYNCED_TRADEUP_ITEMS") {
-        const appState = await getAppState();
-        const newCount = appState.syncedTradeupItems + msg.amount;
+      (async () => {
+        if (msg.type === "ADD_APP_SYNCED_TRADEUP_ITEMS") {
+          const appState = await getAppState();
+          const newCount = appState.syncedTradeupItems + msg.amount;
+          await updateSyncedTradeupItems(newCount);
+        }
 
-        await updateSyncedTradeupItems(newCount);
-        return true;
-      }
+        if (msg.type === "ADD_APP_SYNCED_STORAGE_UNIT_ITEMS") {
+          const appState = await getAppState();
+          const newCount = appState.syncedStorageUnitItems + msg.amount;
+          await updateSyncedStorageUnitItems(newCount);
+        }
 
-      if (msg.type === "ADD_APP_SYNCED_STORAGE_UNIT_ITEMS") {
-        // update synced storage unit items count
-        const appState = await getAppState();
-        const newCount = appState.syncedStorageUnitItems + msg.amount;
-
-        await updateSyncedStorageUnitItems(newCount);
-        return true;
-      }
-
-      if (msg.type === "ADD_NOTORIZED_TRADEUP_ITEMS") {
-        const appState = await getAppState();
-        const newCount = appState.notarizedTradeupItems + msg.amount;
-
-        await updateNotarizedTradeupItems(newCount);
-        return true;
-      }
+        if (msg.type === "ADD_NOTORIZED_TRADEUP_ITEMS") {
+          const appState = await getAppState();
+          const newCount = appState.notarizedTradeupItems + msg.amount;
+          await updateNotarizedTradeupItems(newCount);
+        }
+      })();
+      return; // fire-and-forget
     }
   }
 );
