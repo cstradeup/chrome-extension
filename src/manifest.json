@@ -2,10 +2,7 @@
   "manifest_version": 3,
   "name": "CSTRADEUP Portfolio and Trade Up Helper",
   "permissions": [
-    "alarms",
-    "declarativeNetRequestWithHostAccess",
     "offscreen",
-    "scripting",
     "activeTab",
     "storage",
     "tabs",
