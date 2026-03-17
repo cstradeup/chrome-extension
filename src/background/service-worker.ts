@@ -34,13 +34,11 @@ const HOSTNAME = CSTRADEUP_HOSTNAME;
 const UPDATE_INVENTORY_ROUTE = "/account/inventory/extension/update";
 const INVENTORY_HISTORY_ROUTE = "/account/inventory/extension/history";
 
-console.log("background loaded");
 
 // Initialize badge to match persisted app state on service worker startup
 getAppState().then(state => syncBadge(state.status));
 chrome.runtime.onMessage.addListener(
   (msg: MessageType, sender, sendResponse) => {
-    console.log("CALLED BACKGROUD!! ", msg);
 
     if (isApiPostPayload(msg)) {
       (async () => {
@@ -50,11 +48,9 @@ chrome.runtime.onMessage.addListener(
             results: msg.results,
           });
 
-          console.log("API post response:", resp);
-
           try {
             const respJson = await resp.json();
-            console.log("API post response JSON:", respJson);
+
             if (respJson.total) {
               await updateSyncedInventoryItems(respJson.total);
             }
@@ -295,13 +291,11 @@ async function ensureMemberSince(force = false): Promise<boolean> {
     const steamData = await getStore();
 
     if (!steamData?.steam_id || !steamData?.token) {
-      console.log("ensureMemberSince: no steam credentials — skipping");
       return false;
     }
 
     // Skip fetch when we already have a value for the current user
     if (!force && steamData.memberSince) {
-      console.log("ensureMemberSince: already stored —", steamData.memberSince);
       return true;
     }
 
@@ -315,7 +309,6 @@ async function ensureMemberSince(force = false): Promise<boolean> {
     if (resp?.success && typeof resp.age === "object") {
       const { memberSince } = resp.age as SteamAccountAge;
       await saveMemberSince(memberSince);
-      console.log(`ensureMemberSince: saved — ${memberSince}`);
       return true;
     }
 

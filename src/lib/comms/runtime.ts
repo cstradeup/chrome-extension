@@ -5,7 +5,6 @@ export async function ActionPostApi(steamId: string, results: Record<string, Inv
     // Send inventory data to background to POST to API (avoids CORS)
     return new Promise((resolve) => {
         chrome.runtime.sendMessage<ApiPostPayload>({ type: 'POST_TO_API', steamId, results }, (resp) => {
-            console.log('ActionPostApi Background response:', resp);
             resolve({ steamId, posted: resp?.ok === true });
         });
     });
@@ -15,7 +14,6 @@ export async function ActionInventoryHistory(steamId: string, payload: unknown) 
     // Send inventory data to background to POST to API (avoids CORS)
     return new Promise((resolve) => {
         chrome.runtime.sendMessage<InventoryPayload>({ type: 'INVENTORY_HISTORY', steamId, payload }, (resp) => {
-            console.log('ActionInventoryHistory Background response:', resp);
             resolve({ steamId, posted: resp?.ok === true });
         });
     });
@@ -25,7 +23,6 @@ export async function ActionStartInventoryHistorySync(steamId: string | null, to
     // Send inventory data to background to POST to API (avoids CORS)
     return new Promise((resolve) => {
         chrome.runtime.sendMessage<StartInventoryHistoryPayload>({ type: 'START_INVENTORY_HISTORY', steamId, token, auth }, (resp) => {
-            console.log('ActionStartInventoryHistorySync Background response:', resp);
             resolve({ posted: resp?.ok === true });
         });
     });
@@ -34,7 +31,6 @@ export async function ActionStartInventoryHistorySync(steamId: string | null, to
 export async function ActionStopOperation() {
     return new Promise((resolve) => {
         chrome.runtime.sendMessage<StopOperationPayload>({ type: 'STOP_OPERATION' }, (resp) => {
-            console.log('ActionStopOperation Background response:', resp);
             resolve({ stopped: resp?.ok === true });
         });
     });

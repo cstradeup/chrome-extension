@@ -128,5 +128,3 @@ window.addEventListener('message', (event: MessageEvent) => {
     window.postMessage(apiResponse, '*');
   });
 });
-
-console.log('[CSTRADEUP] Relay content script loaded');

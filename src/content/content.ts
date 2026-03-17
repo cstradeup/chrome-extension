@@ -45,7 +45,6 @@ async function flushPending(): Promise<void> {
   const payload = { ...pendingContexts };
   const steamId = pendingSteamId;
 
-  console.log('[CSTRADEUP] Relaying inventory data to background for', steamId, Object.keys(payload));
   try {
     await ActionPostApi(steamId, payload);
   } catch (err) {
@@ -62,7 +61,7 @@ window.addEventListener('message', (event: MessageEvent) => {
 
   pendingSteamId = msg.steamId;
   pendingContexts[msg.contextAppId] = msg.data;
-  console.log('[CSTRADEUP] Received intercepted context', msg.contextAppId);
+  
   scheduleBatchFlush();
 });
 

@@ -118,19 +118,9 @@ class InventoryAccumulator {
     pages.push(data);
     this.pages.set(contextAppId, pages);
 
-    const pageNum = pages.length;
-    const assetCount = data.assets?.length ?? 0;
-    console.log(
-      `[CSTRADEUP] Page ${pageNum} for ${contextAppId}: ${assetCount} assets`,
-      data.more_items ? `(more pending, last_assetid=${data.last_assetid})` : '(final page)',
-    );
-
     if (data.more_items) {
       // More pages expected — arm a safety timeout
       const timer = setTimeout(() => {
-        console.warn(
-          `[CSTRADEUP] Timeout waiting for more pages for ${contextAppId} — relaying ${pages.length} page(s) collected so far`,
-        );
         this.finalize(contextAppId, onComplete);
       }, InventoryAccumulator.TIMEOUT_MS);
       this.timers.set(contextAppId, timer);
@@ -197,10 +187,6 @@ class InventoryAccumulator {
       descriptions: Array.from(descMap.values()),
     };
 
-    console.log(
-      `[CSTRADEUP] Merged ${pages.length} pages: ${allAssets.length} assets, ${descMap.size} unique descriptions`,
-    );
-
     return merged;
   }
 }
@@ -246,11 +232,6 @@ function handleInterceptedPage(
   if (!data || !data.success) return;
 
   accumulator.addPage(contextAppId, data, (ctxId, merged) => {
-    console.log(
-      `[CSTRADEUP] Inventory complete (${source}) for ${ctxId}:`,
-      merged.total_inventory_count ?? 'unknown', 'total items,',
-      merged.assets?.length ?? 0, 'assets captured',
-    );
 
     const steamId = findSteamID();
     if (steamId) {
