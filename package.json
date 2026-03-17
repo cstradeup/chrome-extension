@@ -17,7 +17,8 @@
         "watch:css": "tailwindcss -i src/styles/tailwind.css -o styles.css --watch",
         "build:webpack": "npm run build:css && NODE_ENV=production webpack --config webpack.config.js",
         "build:webpack:dev": "npm run build:css && NODE_ENV=development webpack --config webpack.config.js",
-        "dev": "npm run build:webpack:dev"
+        "dev": "npm run build:webpack:dev",
+        "zip": "cd build && zip -r ../extension.zip . && echo 'Created extension.zip'"
     },
     "homepage": "https://github.com/cstradeup/extension#readme",
     "devDependencies": {
@@ -41,8 +42,6 @@
         "copy-webpack-plugin": "^11.0.0",
         "css-loader": "^6.7.3",
         "daisyui": "^5.5.5",
-        "esbuild": "^0.25.12",
-        "esbuild-plugin-polyfill-node": "^0.3.0",
         "file-loader": "^6.2.0",
         "fs-extra": "^11.1.0",
         "html-loader": "^4.2.0",
