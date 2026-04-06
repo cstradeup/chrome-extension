@@ -15,13 +15,10 @@ import { StorageKey } from './lib/storage/keys';
 import { getAppState, updateStatus, AppState } from './lib/storage/reducer/app';
 import { clearBadge } from './lib/badge';
 import { getStore as getSteamStore }           from './lib/storage/reducer/steam';
-import { storeAccessToken as storeSteamToken } from './lib/storage/reducer/steam';
 import { getStore as getCstradeupStore }       from './lib/storage/reducer/cstradeup';
-import { storeAccessToken as storeCstradeupToken } from './lib/storage/reducer/cstradeup';
 import { getDevLogs }                          from './lib/storage/reducer/logs';
 import { isRunningOffscreen }                  from './lib/utils';
-import { checkOnboardingState }                from './lib/session';
-import { CSTRADEUP_DOMAIN }                    from './lib/env';
+import { refreshSessions, checkOnboardingState } from './lib/session';
 
 import { queryElements }                       from './popup/elements';
 import { wireActions }                         from './popup/actions';
@@ -35,11 +32,10 @@ import { ActionEnsureMemberSince }             from './lib/comms/runtime';
 document.addEventListener('DOMContentLoaded', async () => {
     const els = queryElements();
 
-    // 1. Persist auth cookies
-    await persistCookies();
-
-    // 2. Onboarding gate — block popup until both sessions are active
-    const onboardingState = await checkOnboardingState();
+    // 1. Sync cookie state → storage and determine onboarding step.
+    //    This both persists fresh cookies AND clears tokens whose
+    //    cookies have expired, ensuring stored tokens stay in sync.
+    const onboardingState = await refreshSessions();
     renderOnboarding(els, onboardingState);
 
     // Wire recheck buttons (always, even if hidden)
@@ -62,8 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function wireRecheckButtons(els: ReturnType<typeof queryElements>) {
     const recheck = async () => {
-        await persistCookies();
-        const state = await checkOnboardingState();
+        const state = await refreshSessions();
         renderOnboarding(els, state);
 
         if (state === 'ready') {
@@ -123,20 +118,6 @@ async function bootMainContent(els: ReturnType<typeof queryElements>) {
 }
 
 // ---------------------------------------------------------------------------
-// Cookie persistence
-// ---------------------------------------------------------------------------
-
-async function persistCookies() {
-    const [steamCookies, cstradeupCookies] = await Promise.all([
-        chrome.cookies.getAll({ domain: 'steamcommunity.com', name: 'steamLoginSecure' }),
-        chrome.cookies.getAll({ domain: CSTRADEUP_DOMAIN, name: 'auth' }),
-    ]);
-
-    if (steamCookies.length > 0)    await storeSteamToken(steamCookies[0].value);
-    if (cstradeupCookies.length > 0) await storeCstradeupToken(cstradeupCookies[0].value);
-}
-
-// ---------------------------------------------------------------------------
 // Full render — called once on boot
 // ---------------------------------------------------------------------------
 
@@ -179,6 +160,28 @@ async function onStorageChanged(
     els: ReturnType<typeof queryElements>,
     changes: { [key: string]: chrome.storage.StorageChange },
 ) {
+    // ── Session health check ─────────────────────────────────────
+    // When a stored token changes, inspect whether the auth credential
+    // was removed (session expired).  If so, verify with live cookies
+    // and re-show onboarding when the session is truly gone.
+    if (StorageKey.STEAM_ACCESS_TOKEN in changes || StorageKey.CSTRADEUP_ACCESS_TOKEN in changes) {
+        const [steamData, cstradeupData] = await Promise.all([
+            getSteamStore(),
+            getCstradeupStore(),
+        ]);
+
+        if (!steamData?.token || !cstradeupData?.auth) {
+            // Double-check with cookies (authoritative source).
+            // Avoids false positives when storage was nuked but
+            // cookies are still alive.
+            const onboardingState = await checkOnboardingState();
+            if (onboardingState !== 'ready') {
+                renderOnboarding(els, onboardingState);
+                return; // Skip normal renders while onboarding is showing
+            }
+        }
+    }
+
     if (StorageKey.APP_STATE in changes) {
         const state = tryParse<AppState>(changes[StorageKey.APP_STATE].newValue);
         if (state) {
