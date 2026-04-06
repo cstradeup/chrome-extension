@@ -11,12 +11,15 @@ export type InventoryResponse = {
   more_items?: number;
   /** Cursor for the next page (stripped after merge) */
   last_assetid?: string;
+  /** Asset Properties */
+  asset_properties?: any[]
+  
   [k: string]: any;
 };
 
 export type SteamInventoryDataPayload = Record<string, InventoryResponse>;
 
-type TypeMessage = 'POST_TO_API' | 'START_CRAWL' | 'INVENTORY_HISTORY' | 'START_INVENTORY_HISTORY' | 'STOP_OPERATION' | 'LOG_MESSAGE' | 'UPDATE_CURSOR' | 'UPDATE_APP_STATE' | 'ENSURE_MEMBER_SINCE' | 'NOTARIZE_CURSOR' | OffscreenMessage
+type TypeMessage = 'POST_TO_API' | 'START_CRAWL' | 'INVENTORY_HISTORY' | 'START_INVENTORY_HISTORY' | 'STOP_OPERATION' | 'LOG_MESSAGE' | 'UPDATE_CURSOR' | 'UPDATE_APP_STATE' | 'ENSURE_MEMBER_SINCE' | 'NOTARIZE_CURSOR' | 'STEAM_BUY_LISTING' | 'STEAM_FETCH_BILLING_INFO' | 'STEAM_GET_WALLET_INFO' | 'STEAM_CONVERT_PRICE' | OffscreenMessage
 
 type OffscreenMessage = 'ADD_APP_SYNCED_TRADEUP_ITEMS' | 'ADD_APP_SYNCED_STORAGE_UNIT_ITEMS' | 'ADD_NOTARIZED_TRADEUP_ITEMS'
 
@@ -125,7 +128,51 @@ export function isNotarizeCursorPayload(msg: unknown): msg is NotarizeCursorPayl
     return msg.type === 'NOTARIZE_CURSOR' && 'cursor' in msg
 }
 
-export type MessageType = ApiPostPayload | InventoryPayload | StartInventoryHistoryPayload | StopOperationPayload | LogMessage | UpdateCursor | AppStateUpdate | OffscreenPayloadMessage | EnsureMemberSincePayload | NotarizeCursorPayload
+export type SteamBuyListingPayload = PayloadMessage & {
+    type: 'STEAM_BUY_LISTING',
+    listingId: string,
+    subtotal: number,
+    fee: number,
+    total: number,
+    currency: number,
+}
+
+export function isSteamBuyListingPayload(msg: unknown): msg is SteamBuyListingPayload {
+    if (!isTypePayloadMessage(msg)) return false
+    return msg.type === 'STEAM_BUY_LISTING' && 'listingId' in msg
+}
+
+export type SteamFetchBillingInfoPayload = PayloadMessage & {
+    type: 'STEAM_FETCH_BILLING_INFO',
+}
+
+export function isSteamFetchBillingInfoPayload(msg: unknown): msg is SteamFetchBillingInfoPayload {
+    if (!isTypePayloadMessage(msg)) return false
+    return msg.type === 'STEAM_FETCH_BILLING_INFO'
+}
+
+export type SteamGetWalletInfoPayload = PayloadMessage & {
+    type: 'STEAM_GET_WALLET_INFO',
+}
+
+export function isSteamGetWalletInfoPayload(msg: unknown): msg is SteamGetWalletInfoPayload {
+    if (!isTypePayloadMessage(msg)) return false
+    return msg.type === 'STEAM_GET_WALLET_INFO'
+}
+
+export type SteamConvertPricePayload = PayloadMessage & {
+    type: 'STEAM_CONVERT_PRICE',
+    subtotal: number,
+    fee: number,
+    total: number,
+}
+
+export function isSteamConvertPricePayload(msg: unknown): msg is SteamConvertPricePayload {
+    if (!isTypePayloadMessage(msg)) return false
+    return msg.type === 'STEAM_CONVERT_PRICE' && 'subtotal' in msg && 'fee' in msg && 'total' in msg
+}
+
+export type MessageType = ApiPostPayload | InventoryPayload | StartInventoryHistoryPayload | StopOperationPayload | LogMessage | UpdateCursor | AppStateUpdate | OffscreenPayloadMessage | EnsureMemberSincePayload | NotarizeCursorPayload | SteamBuyListingPayload | SteamFetchBillingInfoPayload | SteamGetWalletInfoPayload | SteamConvertPricePayload
 
 export const CSTRADEUPMessage = 'cstradeup_scripts'
 export type CSTRADEUPMessageType = 'cstradeup_scripts'

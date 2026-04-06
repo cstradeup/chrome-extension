@@ -16,6 +16,7 @@ export enum StorageKey {
     LAST_UPDATE_HISTORY_DATE = 'last_update_history_date',
     DEV_LOGS = 'dev_logs',
     APP_STATE = 'app_state',
+    BILLING_INFO = 'billing_info',
 }
 
 export type DynamicStorageKey = string;

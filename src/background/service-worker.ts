@@ -4,6 +4,10 @@ import {
   isApiPostPayload,
   isAppStateUpdate,
   isEnsureMemberSince,
+  isSteamBuyListingPayload,
+  isSteamFetchBillingInfoPayload,
+  isSteamGetWalletInfoPayload,
+  isSteamConvertPricePayload,
   isInventoryPayload,
   isLogMessage,
   isNotarizeCursorPayload,
@@ -26,6 +30,7 @@ import {
 import { getStore, saveMemberSince } from "../lib/storage/reducer/steam";
 import { appendDevLog } from "../lib/storage/reducer/logs";
 import { loadInventoryHistory, requestStop } from "./services/notary";
+import { handleBuyListing, handleFetchBillingInfo, handleGetWalletInfo, handleConvertPrice } from "./services/steam-market";
 import { getStore as getCstradeupStore, saveHistoryCursor } from "../lib/storage/reducer/cstradeup";
 import { SteamAccountAge } from "./offscreen/user/badges";
 import { syncBadge } from "../lib/badge";
@@ -103,6 +108,36 @@ chrome.runtime.onMessage.addListener(
 
     if (isNotarizeCursorPayload(msg)) {
       handleNotarizeCursor(msg.cursor).then(sendResponse);
+      return true; // keep port open
+    }
+
+    if (isSteamBuyListingPayload(msg)) {
+      handleBuyListing({
+        listingId: msg.listingId,
+        subtotal: msg.subtotal,
+        fee: msg.fee,
+        total: msg.total,
+        currency: msg.currency,
+      }).then(sendResponse);
+      return true; // keep port open
+    }
+
+    if (isSteamFetchBillingInfoPayload(msg)) {
+      handleFetchBillingInfo().then(sendResponse);
+      return true; // keep port open
+    }
+
+    if (isSteamGetWalletInfoPayload(msg)) {
+      handleGetWalletInfo().then(sendResponse);
+      return true; // keep port open
+    }
+
+    if (isSteamConvertPricePayload(msg)) {
+      handleConvertPrice({
+        subtotal: msg.subtotal,
+        fee: msg.fee,
+        total: msg.total,
+      }).then(sendResponse);
       return true; // keep port open
     }
 

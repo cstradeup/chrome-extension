@@ -6,7 +6,8 @@
     "activeTab",
     "storage",
     "tabs",
-    "cookies"
+    "cookies",
+    "scripting"
   ],
   "host_permissions": [
     "https://steamcommunity.com/*",
