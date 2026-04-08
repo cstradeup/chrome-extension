@@ -73,6 +73,27 @@ export function clearAccessTokenFromStorage(): Promise<void> {
     return gStore.removeWithStorage(chrome.storage.local, StorageKey.STEAM_ACCESS_TOKEN);
 }
 
+/**
+ * Soft-clears the stored Steam access token while preserving identity
+ * metadata (steam_id, memberSince, profile_part).  Unlike
+ * `clearAccessTokenFromStorage` which nukes the entire key, this only
+ * removes the auth credential so the extension can detect the session
+ * is gone and re-show onboarding.
+ *
+ * Called automatically when the `steamLoginSecure` cookie expires or
+ * is removed.
+ */
+export async function invalidateToken(): Promise<void> {
+    const oldStore = await getStore();
+    if (!oldStore?.token) return; // Already invalidated, no-op
+
+    return gStore.setWithStorage(chrome.storage.local, StorageKey.STEAM_ACCESS_TOKEN, {
+        ...oldStore,
+        token: undefined,
+        updated_at: Date.now(),
+    } as SteamStore);
+}
+
 export function getStore(): Promise<SteamStore | null> {
     return gStore.getWithStorage<SteamStore>(chrome.storage.local, StorageKey.STEAM_ACCESS_TOKEN);
 }

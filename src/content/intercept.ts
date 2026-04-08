@@ -28,6 +28,7 @@ interface InventoryResponseLike {
   last_assetid?: string;        // cursor for next page
   assets?: any[];
   descriptions?: any[];
+  asset_properties?: any[];
   [k: string]: any;
 }
 
@@ -180,11 +181,17 @@ class InventoryAccumulator {
       }
     }
 
+    const allProperties: any[] = [];
+    for (const p of pages) {
+      if (Array.isArray(p.asset_properties)) allProperties.push(...p.asset_properties);
+    }
+
     const merged: InventoryResponseLike = {
       success: first.success,
       total_inventory_count: first.total_inventory_count,
       assets: allAssets,
       descriptions: Array.from(descMap.values()),
+      asset_properties: allProperties,
     };
 
     return merged;

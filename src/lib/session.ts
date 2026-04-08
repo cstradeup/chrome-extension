@@ -1,4 +1,6 @@
 import { CSTRADEUP_DOMAIN } from "./env";
+import { storeAccessToken as storeSteamToken, invalidateToken as invalidateSteamToken } from './storage/reducer/steam';
+import { storeAccessToken as storeCstradeupToken, invalidateAuth as invalidateCstradeupAuth } from './storage/reducer/cstradeup';
 
 /**
  * Session-checking utilities for the onboarding flow.
@@ -24,6 +26,9 @@ export type OnboardingState = 'steam_required' | 'cstradeup_required' | 'ready';
  *  1. `steam_required`     — No `steamLoginSecure` cookie on steamcommunity.com
  *  2. `cstradeup_required` — Steam is OK but no `auth` cookie for CSTRADEUP
  *  3. `ready`              — Both sessions are active
+ *
+ * **Lightweight** — only checks cookie presence, does NOT modify storage.
+ * Use `refreshSessions()` when you also need to sync stored tokens.
  */
 export async function checkOnboardingState(): Promise<OnboardingState> {
     const hasSteam = await hasSteamSession();
@@ -32,6 +37,60 @@ export async function checkOnboardingState(): Promise<OnboardingState> {
     const hasCstradeup = await hasCstradeupSession();
     if (!hasCstradeup) return 'cstradeup_required';
 
+    return 'ready';
+}
+
+/**
+ * Syncs session state between the browser's cookie jar and extension
+ * storage, then returns the resulting `OnboardingState`.
+ *
+ * For **each** provider (Steam, CSTRADEUP):
+ *   - Cookie present  → persist the fresh value into storage
+ *   - Cookie absent   → soft-clear the stored credential (preserving
+ *     identity metadata / crawl progress)
+ *
+ * This is the **preferred entry-point** for all session checks that
+ * precede user-facing operations.  It guarantees stored tokens are in
+ * sync with live cookies so that subsequent reads always use the most
+ * up-to-date credential — or correctly detect a missing session.
+ */
+export async function refreshSessions(): Promise<OnboardingState> {
+    const [steamCookies, cstradeupCookies] = await Promise.all([
+        chrome.cookies.getAll({ domain: 'steamcommunity.com', name: 'steamLoginSecure' }),
+        chrome.cookies.getAll({ domain: CSTRADEUP_DOMAIN, name: 'auth' }),
+    ]);
+
+    let hasSteam = false;
+    let hasCstradeup = false;
+
+    // ── Steam ───────────────────────────────────────────────────────
+    if (steamCookies.length > 0) {
+        try {
+            await storeSteamToken(steamCookies[0].value);
+            hasSteam = true;
+        } catch (e) {
+            console.warn('[CSTRADEUP] Steam cookie present but value invalid — clearing stored token', e);
+            await invalidateSteamToken();
+        }
+    } else {
+        await invalidateSteamToken();
+    }
+
+    // ── CSTRADEUP ───────────────────────────────────────────────────
+    if (cstradeupCookies.length > 0) {
+        try {
+            await storeCstradeupToken(cstradeupCookies[0].value);
+            hasCstradeup = true;
+        } catch (e) {
+            console.warn('[CSTRADEUP] CSTRADEUP cookie present but value invalid — clearing stored auth', e);
+            await invalidateCstradeupAuth();
+        }
+    } else {
+        await invalidateCstradeupAuth();
+    }
+
+    if (!hasSteam) return 'steam_required';
+    if (!hasCstradeup) return 'cstradeup_required';
     return 'ready';
 }
 

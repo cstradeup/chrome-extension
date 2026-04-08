@@ -4,6 +4,10 @@ import {
   isApiPostPayload,
   isAppStateUpdate,
   isEnsureMemberSince,
+  isSteamBuyListingPayload,
+  isSteamFetchBillingInfoPayload,
+  isSteamGetWalletInfoPayload,
+  isSteamConvertPricePayload,
   isInventoryPayload,
   isLogMessage,
   isNotarizeCursorPayload,
@@ -23,13 +27,14 @@ import {
   updateSyncedStorageUnitItems,
   updateSyncedTradeupItems,
 } from "../lib/storage/reducer/app";
-import { getStore, saveMemberSince } from "../lib/storage/reducer/steam";
+import { getStore, saveMemberSince, invalidateToken as invalidateSteamToken, storeAccessToken as storeSteamToken } from "../lib/storage/reducer/steam";
 import { appendDevLog } from "../lib/storage/reducer/logs";
 import { loadInventoryHistory, requestStop } from "./services/notary";
-import { getStore as getCstradeupStore, saveHistoryCursor } from "../lib/storage/reducer/cstradeup";
+import { handleBuyListing, handleFetchBillingInfo, handleGetWalletInfo, handleConvertPrice } from "./services/steam-market";
+import { getStore as getCstradeupStore, saveHistoryCursor, invalidateAuth as invalidateCstradeupAuth, storeAccessToken as storeCstradeupToken } from "../lib/storage/reducer/cstradeup";
 import { SteamAccountAge } from "./offscreen/user/badges";
 import { syncBadge } from "../lib/badge";
-import { CSTRADEUP_HOSTNAME } from "../lib/env";
+import { CSTRADEUP_HOSTNAME, CSTRADEUP_DOMAIN } from "../lib/env";
 const HOSTNAME = CSTRADEUP_HOSTNAME;
 const UPDATE_INVENTORY_ROUTE = "/account/inventory/extension/update";
 const INVENTORY_HISTORY_ROUTE = "/account/inventory/extension/history";
@@ -103,6 +108,36 @@ chrome.runtime.onMessage.addListener(
 
     if (isNotarizeCursorPayload(msg)) {
       handleNotarizeCursor(msg.cursor).then(sendResponse);
+      return true; // keep port open
+    }
+
+    if (isSteamBuyListingPayload(msg)) {
+      handleBuyListing({
+        listingId: msg.listingId,
+        subtotal: msg.subtotal,
+        fee: msg.fee,
+        total: msg.total,
+        currency: msg.currency,
+      }).then(sendResponse);
+      return true; // keep port open
+    }
+
+    if (isSteamFetchBillingInfoPayload(msg)) {
+      handleFetchBillingInfo().then(sendResponse);
+      return true; // keep port open
+    }
+
+    if (isSteamGetWalletInfoPayload(msg)) {
+      handleGetWalletInfo().then(sendResponse);
+      return true; // keep port open
+    }
+
+    if (isSteamConvertPricePayload(msg)) {
+      handleConvertPrice({
+        subtotal: msg.subtotal,
+        fee: msg.fee,
+        total: msg.total,
+      }).then(sendResponse);
       return true; // keep port open
     }
 
@@ -356,4 +391,40 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   // Different user → force refresh
   const userChanged = prev?.steam_id !== next.steam_id;
   await ensureMemberSince(userChanged);
+});
+
+// ---------------------------------------------------------------------------
+// Cookie-change listener — proactive session lifecycle management
+// ---------------------------------------------------------------------------
+// Watches for cookie additions, changes, and removals to keep stored
+// tokens in sync with the browser’s cookie jar.  This ensures that:
+//   1. Fresh cookie values are persisted immediately (no stale tokens)
+//   2. Expired / removed cookies trigger token invalidation so the
+//      popup can re-show onboarding instead of using dead credentials.
+//
+// When a cookie is *overwritten* Chrome fires two events: one "removed"
+// with cause "overwrite" (old value), then one "set" (new value).  We
+// skip the intermediate removal to avoid a brief flash of invalidation.
+// ---------------------------------------------------------------------------
+
+chrome.cookies.onChanged.addListener(async ({ cookie, removed, cause }) => {
+  // ── Steam session cookie ────────────────────────────────────────────
+  if (cookie.domain.includes('steamcommunity.com') && cookie.name === 'steamLoginSecure') {
+    if (removed && cause !== 'overwrite' && cause !== 'expired_overwrite') {
+      await invalidateSteamToken();
+    } else if (!removed) {
+      try { await storeSteamToken(cookie.value); }
+      catch (e) { console.warn('[CSTRADEUP] Steam cookie set but value invalid', e); }
+    }
+  }
+
+  // ── CSTRADEUP session cookie ─────────────────────────────────────────
+  if (cookie.domain.includes(CSTRADEUP_DOMAIN) && cookie.name === 'auth') {
+    if (removed && cause !== 'overwrite' && cause !== 'expired_overwrite') {
+      await invalidateCstradeupAuth();
+    } else if (!removed) {
+      try { await storeCstradeupToken(cookie.value); }
+      catch (e) { console.warn('[CSTRADEUP] CSTRADEUP cookie set but value invalid', e); }
+    }
+  }
 });

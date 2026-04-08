@@ -113,6 +113,26 @@ export function clearAccessTokenFromStorage(): Promise<void> {
     return gStore.removeWithStorage(chrome.storage.local, StorageKey.CSTRADEUP_ACCESS_TOKEN);
 }
 
+/**
+ * Soft-clears the stored CSTRADEUP auth token while preserving crawl
+ * state (history_cursor, sync_completed, sync_phase, etc.).  This lets
+ * the extension detect the session is gone and re-show onboarding
+ * without losing sync progress.
+ *
+ * Called automatically when the CSTRADEUP `auth` cookie expires or is
+ * removed.
+ */
+export async function invalidateAuth(): Promise<void> {
+    const oldStore = await getStore();
+    if (!oldStore?.auth) return; // Already invalidated, no-op
+
+    return gStore.setWithStorage<CSTRADEUPStore>(chrome.storage.local, StorageKey.CSTRADEUP_ACCESS_TOKEN, {
+        ...oldStore,
+        auth: undefined,
+        updated_at: Date.now(),
+    });
+}
+
 export async function getStore(): Promise<CSTRADEUPStore | null> {
     return gStore.getWithStorage<CSTRADEUPStore>(chrome.storage.local, StorageKey.CSTRADEUP_ACCESS_TOKEN);
 }

@@ -81,6 +81,18 @@ function buildRuntimeMessage(action: string, payload: unknown): Record<string, u
     case 'NOTARIZE_CURSOR':
       return { type: 'NOTARIZE_CURSOR', cursor: payload };
 
+    case 'STEAM:BUY_LISTING':
+      return { type: 'STEAM_BUY_LISTING', ...(payload as object) };
+
+    case 'STEAM:FETCH_BILLING_INFO':
+      return { type: 'STEAM_FETCH_BILLING_INFO' };
+
+    case 'STEAM:GET_WALLET_INFO':
+      return { type: 'STEAM_GET_WALLET_INFO' };
+
+    case 'STEAM:CONVERT_PRICE':
+      return { type: 'STEAM_CONVERT_PRICE', ...(payload as object) };
+
     default:
       console.warn(`[CSTRADEUP relay] Unknown action: ${action}`);
       return null;
