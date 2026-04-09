@@ -17,7 +17,7 @@ class Store {
         }
 
         try {
-            return JSON.parse(a[key]) as T;
+            return JSON.parse(a[key] as string) as T;
         } catch (e) {
             // Fallback if this is an old key not stored as JSON
             return a[key] as T;
