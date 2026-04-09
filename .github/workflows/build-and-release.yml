@@ -1,0 +1,111 @@
+# Build & Release
+#
+# Builds the Chrome extension, packages artifacts,
+# and creates a GitHub Release when a version tag is pushed.
+#
+# Triggers:
+#   push to main        → build + upload artifacts (CI validation)
+#   pull_request        → build only (validation)
+#   tag v*              → build + package + GitHub Release
+#
+# Artifacts produced:
+#   Chrome:  cstradeup-v{ver}-chrome.zip
+
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+# Cancel in-progress runs for the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Build: Chrome only (production)
+  # ─────────────────────────────────────────────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (${{ matrix.browser }}, production)
+        run: pnpm build:${{ matrix.browser }}
+
+      - name: Package extension
+        run: pnpm package:${{ matrix.browser }}
+        env:
+          SKIP_CRX: '1'
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.browser }}-build
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload unpacked build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.browser }}-unpacked
+          path: build/
+          if-no-files-found: error
+          retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Release: triggered only on version tags (v*)
+  # ─────────────────────────────────────────────────────────────────────────
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Chrome artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: chrome-build
+          path: release/chrome
+
+      - name: List release artifacts
+        run: find release/ -type f | sort
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            release/chrome/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

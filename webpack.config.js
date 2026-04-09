@@ -23,6 +23,13 @@ var fileExtensions = [
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
+// ---------------------------------------------------------------------------
+// Browser target: "chrome" (default) or "firefox"
+// ---------------------------------------------------------------------------
+const BROWSER = process.env.BROWSER || "chrome";
+const isFirefox = BROWSER === "firefox";
+const isChrome = BROWSER === "chrome";
+
 // Environment-specific config for CSTRADEUP
 const ENV_CONFIG = {
   development: {
@@ -54,6 +61,9 @@ var options = {
     "inject-api": path.join(__dirname, "src", "content", "inject-api.ts"),
     relay: path.join(__dirname, "src", "content", "relay.ts"),
     intercept: path.join(__dirname, "src", "content", "intercept.ts"),
+    // Offscreen is used on both browsers:
+    //   Chrome: loaded via chrome.offscreen.createDocument()
+    //   Firefox: loaded directly in background_ff.html (background page)
     offscreen: path.join(__dirname, "src", "background", "offscreen", "offscreen.ts"),
   },
   // chromeExtensionBoilerplate: {
@@ -138,6 +148,7 @@ var options = {
       __CSTRADEUP_HOSTNAME__: JSON.stringify(currentEnv.HOSTNAME),
       __CSTRADEUP_DOMAIN__: JSON.stringify(currentEnv.DOMAIN),
       __IS_DEV__: JSON.stringify(isDevelopment),
+      __BROWSER__: JSON.stringify(BROWSER),
     }),
     // new ExtReloader({
     //   manifest: path.resolve(__dirname, "src/manifest.json")
@@ -175,6 +186,41 @@ var options = {
                   manifest.externally_connectable.matches
                 );
               }
+            }
+
+            // ── Firefox-specific manifest transformations ──────────────────
+            if (isFirefox) {
+              // 1. Add gecko addon id (required for Firefox extensions)
+              //    Override with FIREFOX_ADDON_ID env var or use default.
+              manifest.browser_specific_settings = {
+                gecko: {
+                  id: process.env.FIREFOX_ADDON_ID || "extension@cstradeup.net",
+                  strict_min_version: "128.0",
+                },
+              };
+
+              // 2. Firefox MV3 uses background.scripts (not service_worker).
+              //    Firefox creates an auto-generated background page and loads
+              //    each script via <script> tags.  We include both the main
+              //    background script AND the offscreen bundle so the WASM/Worker
+              //    notarization code runs in the same context — no offscreen API needed.
+              manifest.background = {
+                scripts: [
+                  manifest.background?.service_worker || "service-worker.bundle.js",
+                  "offscreen.bundle.js",
+                ],
+              };
+
+              // 3. Remove Chrome-only permissions
+              if (manifest.permissions) {
+                const chromeOnlyPerms = ["offscreen"];
+                manifest.permissions = manifest.permissions.filter(
+                  (p) => !chromeOnlyPerms.includes(p)
+                );
+              }
+
+              // 4. externally_connectable is not supported in Firefox
+              delete manifest.externally_connectable;
             }
 
             return Buffer.from(JSON.stringify(manifest, null, 2));
@@ -217,14 +263,17 @@ var options = {
         },
       ],
     }),
-    new CopyWebpackPlugin({
-      patterns: [
-        {
-          from: path.join(__dirname, "src", "background", "offscreen", "offscreen.html"),
-          to: path.join(__dirname, "build"),
-        },
-      ],
-    }),
+    // Chrome needs offscreen.html for the chrome.offscreen API;
+    // Firefox loads offscreen.bundle.js directly via background.scripts.
+    isChrome &&
+      new CopyWebpackPlugin({
+        patterns: [
+          {
+            from: path.join(__dirname, "src", "background", "offscreen", "offscreen.html"),
+            to: path.join(__dirname, "build"),
+          },
+        ],
+      }),
     /* new HtmlWebpackPlugin({
       template: path.join(__dirname, "src", "popup.html"),
       filename: "popup.html",
