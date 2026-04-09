@@ -4,7 +4,8 @@ const colors = require("tailwindcss/colors");
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    "./src/**/*.{html,ts}"   // scan popup.html, other HTML + TS files
+    "./src/popup.html",          // scan popup.html for class names
+    "./src/**/*.{html,ts}"   // other HTML + TS files
   ],
   theme: {
     colors,

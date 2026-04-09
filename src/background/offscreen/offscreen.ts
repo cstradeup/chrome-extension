@@ -10,6 +10,8 @@ import { getAccountAge, SteamAccountAge } from "./user/badges";
 import { GetParmsFromCursor, SteamHttpError } from "./inventory_history/helpers";
 import { doSteamRequestAndSendToBackend } from "./inventory_history/request";
 
+import { IS_CHROME } from "../../lib/compat";
+
 // =============================================================================
 // Configuration
 // =============================================================================
@@ -193,7 +195,11 @@ function setupMessageListener(): void {
 }
 
 function signalReady(): void {
-  chrome.runtime.sendMessage({ type: "offscreen_ready" });
+  // On Chrome, the service worker waits for this signal before proceeding.
+  // On Firefox, both scripts run in the same background page — no signal needed.
+  if (IS_CHROME) {
+    chrome.runtime.sendMessage({ type: "offscreen_ready" });
+  }
 }
 
 // =============================================================================

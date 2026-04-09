@@ -35,6 +35,7 @@ import { getStore as getCstradeupStore, saveHistoryCursor, invalidateAuth as inv
 import { SteamAccountAge } from "./offscreen/user/badges";
 import { syncBadge } from "../lib/badge";
 import { CSTRADEUP_HOSTNAME, CSTRADEUP_DOMAIN } from "../lib/env";
+import { IS_CHROME } from "../lib/compat";
 const HOSTNAME = CSTRADEUP_HOSTNAME;
 const UPDATE_INVENTORY_ROUTE = "/account/inventory/extension/update";
 const INVENTORY_HISTORY_ROUTE = "/account/inventory/extension/history";
@@ -226,7 +227,9 @@ async function handleNotarizeCursor(
     // 2. Resolve Steam profile URL
     const profileBaseUrl = await resolveProfileBaseUrl(steamStore.steam_id, steamStore.token);
 
-    // 3. Open offscreen document and forward request
+    // 3. Open offscreen document and forward request.
+    //    Chrome: dynamically creates an offscreen document via chrome.offscreen API.
+    //    Firefox: no-op — the offscreen bundle is already loaded in background_ff.html.
     await openOffscreenDocument();
 
     const resp = await chrome.runtime.sendMessage({
@@ -239,7 +242,8 @@ async function handleNotarizeCursor(
     });
 
     // Handle WASM restart signal (same pattern as existing notarization)
-    if (resp?.shouldShutdown) {
+    // chrome.offscreen API is Chrome-only; Firefox background page persists.
+    if (resp?.shouldShutdown && IS_CHROME) {
       const hasDoc = await chrome.offscreen.hasDocument();
       if (hasDoc) {
         await chrome.offscreen.closeDocument();
@@ -262,7 +266,16 @@ const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 
 let creating: Promise<void> | null = null;
 
+/**
+ * Opens the Chrome offscreen document for WASM operations.
+ *
+ * On Chrome: creates a separate offscreen document via the chrome.offscreen API.
+ * On Firefox: no-op — the offscreen bundle is loaded directly in the persistent
+ *             background page (background_ff.html) alongside service-worker.
+ */
 export async function openOffscreenDocument(): Promise<void> {
+  if (!IS_CHROME) return; // Firefox: offscreen code lives in background page
+
   const offscreenUrl = chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH);
   const hasExistingContext = await chrome.offscreen.hasDocument();
 

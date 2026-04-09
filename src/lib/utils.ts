@@ -55,10 +55,12 @@ export function getCookie(cname: string) {
   return null;
 }
 
-export async function isRunningOffscreen() {
-  const existingContexts = await chrome.runtime.getContexts({});
+import { IS_CHROME } from './compat';
 
-  console.log('existingContexts', existingContexts);
+export async function isRunningOffscreen() {
+  if (!IS_CHROME) return false; // Offscreen API is Chrome-only
+
+  const existingContexts = await chrome.runtime.getContexts({});
 
   const offscreenDocument = existingContexts.find(
     (c) => c.contextType === 'OFFSCREEN_DOCUMENT'

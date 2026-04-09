@@ -1,0 +1,23 @@
+<!--
+  Firefox background page — replaces Chrome's service_worker.
+
+  Why? Firefox MV3 doesn't support service_worker in the same way as Chrome.
+  Instead, a background page gives us a persistent HTML document context that:
+    1. Can load ES modules
+    2. Can spawn Workers / SharedArrayBuffers (needed for WASM + TLSNotary)
+    3. Lets us run the offscreen code in-process (no chrome.offscreen API needed)
+
+  Both scripts listen on chrome.runtime.onMessage and co-exist in the same page.
+  The offscreen handler filters on `request.target === 'offscreen'`.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CSTRADEUP Background</title>
+</head>
+<body>
+  <script type="module" src="service-worker.bundle.js"></script>
+  <script type="module" src="offscreen.bundle.js"></script>
+</body>
+</html>

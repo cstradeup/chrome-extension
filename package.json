@@ -1,6 +1,6 @@
 {
     "name": "cstradeup-extension",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Analyze your CS2 inventory for profitable trade ups. View hidden skins in your Storage Units and other inventory insights.",
     "license": "MIT",
     "directories": {
@@ -11,13 +11,24 @@
         "url": "git+https://github.com/cstradeup/extension.git"
     },
     "scripts": {
-        "clean": "node -e \"require('fs').rmSync('./build', { recursive: true, force: true })\"",
+        "clean": "node -e \"require('fs').rmSync('./build', { recursive: true, force: true }); require('fs').rmSync('./dist', { recursive: true, force: true })\"",
         "build:ts": "tsc",
         "build:css": "tailwindcss -i src/styles/tailwind.css -o styles.css --minify",
         "watch:css": "tailwindcss -i src/styles/tailwind.css -o styles.css --watch",
         "build:webpack": "npm run build:css && NODE_ENV=production webpack --config webpack.config.js",
         "build:webpack:dev": "npm run build:css && NODE_ENV=development webpack --config webpack.config.js",
+        "build:chrome": "BROWSER=chrome npm run build:webpack",
+        "build:firefox": "BROWSER=firefox npm run build:webpack",
+        "build:chrome:dev": "BROWSER=chrome npm run build:webpack:dev",
+        "build:firefox:dev": "BROWSER=firefox npm run build:webpack:dev",
+        "build:all": "npm run build:chrome && npm run package:chrome && npm run clean:build && npm run build:firefox && npm run package:firefox",
+        "clean:build": "node -e \"require('fs').rmSync('./build', { recursive: true, force: true })\"",
         "dev": "npm run build:webpack:dev",
+        "dev:chrome": "npm run build:chrome:dev",
+        "dev:firefox": "npm run build:firefox:dev",
+        "package": "node scripts/package-extension.js",
+        "package:chrome": "BROWSER=chrome node scripts/package-extension.js",
+        "package:firefox": "BROWSER=firefox node scripts/package-extension.js",
         "zip": "cd build && zip -r ../extension.zip . && echo 'Created extension.zip'"
     },
     "homepage": "https://github.com/cstradeup/extension#readme",
@@ -26,6 +37,7 @@
         "@babel/plugin-proposal-class-properties": "^7.18.6",
         "@babel/preset-env": "^7.20.2",
         "@babel/preset-react": "^7.18.6",
+        "@tailwindcss/cli": "^4.2.2",
         "@types/chrome": "^0.1.28",
         "@types/firefox-webext-browser": "^120.0.4",
         "@types/node": "^20.4.10",
@@ -40,6 +52,7 @@
         "buffer": "^6.0.3",
         "clean-webpack-plugin": "^4.0.0",
         "copy-webpack-plugin": "^11.0.0",
+        "crx3": "^1.1.3",
         "css-loader": "^6.7.3",
         "daisyui": "^5.5.5",
         "file-loader": "^6.2.0",
@@ -50,7 +63,7 @@
         "postcss": "^8.5.6",
         "process": "^0.11.10",
         "stream-browserify": "^3.0.0",
-        "tailwindcss": "^4.1.17",
+        "tailwindcss": "^4.2.2",
         "terser-webpack-plugin": "^5.3.6",
         "ts-loader": "^9.4.2",
         "type-fest": "^3.5.2",
@@ -67,6 +80,5 @@
         "comlink": "^4.4.2",
         "tlsn-js": "0.1.0-alpha.12.0"
     },
-    "overrides": {
-    }
+    "overrides": {}
 }
