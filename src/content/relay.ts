@@ -93,6 +93,12 @@ function buildRuntimeMessage(action: string, payload: unknown): Record<string, u
     case 'STEAM:CONVERT_PRICE':
       return { type: 'STEAM_CONVERT_PRICE', ...(payload as object) };
 
+    case 'SYNC_PORTFOLIO':
+      return { type: 'SYNC_PORTFOLIO' };
+
+    case 'LOAD_INVENTORY':
+      return { type: 'LOAD_INVENTORY' };
+
     default:
       console.warn(`[CSTRADEUP relay] Unknown action: ${action}`);
       return null;

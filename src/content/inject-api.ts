@@ -76,16 +76,28 @@ function sendToRelay<T = unknown>(action: string, payload: unknown, timeoutMs = 
 // Public API exposed to the website
 // =============================================================================
 
-const loadInventory = async (...params: any[]) => {
-  //TODO: open inventory tab to trigger inventory interception.
-}
-
 type NotarizeResult = { success: boolean; crafted?: number; error?: string };
+type SyncPortfolioResult = { success: boolean; error?: string };
+type LoadInventoryResult = { success: boolean; error?: string };
+
+/**
+ * Starts inventory sync from the website (same flow as popup "Load Inventory").
+ */
+const loadInventory = async (): Promise<LoadInventoryResult> => {
+  return sendToRelay<LoadInventoryResult>('LOAD_INVENTORY', null);
+}
 
 // Used by the website to claim trade up's cashback tickets.
 const notarizeTradeupItems = async (cursorJson: string): Promise<NotarizeResult> => {
   const cursor: Cursor = JSON.parse(cursorJson);
   return sendToRelay<NotarizeResult>('NOTARIZE_CURSOR', cursor);
+}
+
+/**
+ * Starts portfolio sync from the website (same flow as popup "Load Inventory History").
+ */
+const syncPortfolio = async (): Promise<SyncPortfolioResult> => {
+  return sendToRelay<SyncPortfolioResult>('SYNC_PORTFOLIO', null);
 }
 
 // =============================================================================
@@ -212,6 +224,7 @@ const steam: MarketProvider<SteamBuyListingParams, SteamBuyResult, BillingResult
 // @ts-ignore
 window.cstradeup = {
   loadInventory,
+  syncPortfolio,
   notarizeTradeupItems,
   isInstalled: true,
   lastUpdatedDate: undefined,

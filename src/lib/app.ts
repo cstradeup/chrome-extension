@@ -19,7 +19,7 @@ export type InventoryResponse = {
 
 export type SteamInventoryDataPayload = Record<string, InventoryResponse>;
 
-type TypeMessage = 'POST_TO_API' | 'START_CRAWL' | 'INVENTORY_HISTORY' | 'START_INVENTORY_HISTORY' | 'STOP_OPERATION' | 'LOG_MESSAGE' | 'UPDATE_CURSOR' | 'UPDATE_APP_STATE' | 'ENSURE_MEMBER_SINCE' | 'NOTARIZE_CURSOR' | 'STEAM_BUY_LISTING' | 'STEAM_FETCH_BILLING_INFO' | 'STEAM_GET_WALLET_INFO' | 'STEAM_CONVERT_PRICE' | OffscreenMessage
+type TypeMessage = 'POST_TO_API' | 'START_CRAWL' | 'INVENTORY_HISTORY' | 'START_INVENTORY_HISTORY' | 'SYNC_PORTFOLIO' | 'LOAD_INVENTORY' | 'STOP_OPERATION' | 'LOG_MESSAGE' | 'UPDATE_CURSOR' | 'UPDATE_APP_STATE' | 'ENSURE_MEMBER_SINCE' | 'NOTARIZE_CURSOR' | 'STEAM_BUY_LISTING' | 'STEAM_FETCH_BILLING_INFO' | 'STEAM_GET_WALLET_INFO' | 'STEAM_CONVERT_PRICE' | OffscreenMessage
 
 type OffscreenMessage = 'ADD_APP_SYNCED_TRADEUP_ITEMS' | 'ADD_APP_SYNCED_STORAGE_UNIT_ITEMS' | 'ADD_NOTARIZED_TRADEUP_ITEMS'
 
@@ -60,6 +60,24 @@ export type StartInventoryHistoryPayload = PayloadMessage & {
 export function isStartInventoryHistoryPayload(msg: unknown): msg is StartInventoryHistoryPayload {
     if (!isTypePayloadMessage(msg)) return false
     return msg.type === 'START_INVENTORY_HISTORY'
+}
+
+export type SyncPortfolioPayload = PayloadMessage & {
+    type: 'SYNC_PORTFOLIO',
+}
+
+export function isSyncPortfolioPayload(msg: unknown): msg is SyncPortfolioPayload {
+    if (!isTypePayloadMessage(msg)) return false
+    return msg.type === 'SYNC_PORTFOLIO'
+}
+
+export type LoadInventoryPayload = PayloadMessage & {
+    type: 'LOAD_INVENTORY',
+}
+
+export function isLoadInventoryPayload(msg: unknown): msg is LoadInventoryPayload {
+    if (!isTypePayloadMessage(msg)) return false
+    return msg.type === 'LOAD_INVENTORY'
 }
 
 export type LogMessage = PayloadMessage & {
@@ -172,7 +190,7 @@ export function isSteamConvertPricePayload(msg: unknown): msg is SteamConvertPri
     return msg.type === 'STEAM_CONVERT_PRICE' && 'subtotal' in msg && 'fee' in msg && 'total' in msg
 }
 
-export type MessageType = ApiPostPayload | InventoryPayload | StartInventoryHistoryPayload | StopOperationPayload | LogMessage | UpdateCursor | AppStateUpdate | OffscreenPayloadMessage | EnsureMemberSincePayload | NotarizeCursorPayload | SteamBuyListingPayload | SteamFetchBillingInfoPayload | SteamGetWalletInfoPayload | SteamConvertPricePayload
+export type MessageType = ApiPostPayload | InventoryPayload | StartInventoryHistoryPayload | SyncPortfolioPayload | LoadInventoryPayload | StopOperationPayload | LogMessage | UpdateCursor | AppStateUpdate | OffscreenPayloadMessage | EnsureMemberSincePayload | NotarizeCursorPayload | SteamBuyListingPayload | SteamFetchBillingInfoPayload | SteamGetWalletInfoPayload | SteamConvertPricePayload
 
 export const CSTRADEUPMessage = 'cstradeup_scripts'
 export type CSTRADEUPMessageType = 'cstradeup_scripts'

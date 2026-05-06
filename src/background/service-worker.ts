@@ -4,6 +4,7 @@ import {
   isApiPostPayload,
   isAppStateUpdate,
   isEnsureMemberSince,
+  isLoadInventoryPayload,
   isSteamBuyListingPayload,
   isSteamFetchBillingInfoPayload,
   isSteamGetWalletInfoPayload,
@@ -12,6 +13,7 @@ import {
   isLogMessage,
   isNotarizeCursorPayload,
   isOffscreenPayloadMessage,
+  isSyncPortfolioPayload,
   isStartInventoryHistoryPayload,
   isStopOperationPayload,
   isUpdateCursor,
@@ -36,6 +38,8 @@ import { SteamAccountAge } from "./offscreen/user/badges";
 import { syncBadge } from "../lib/badge";
 import { CSTRADEUP_HOSTNAME, CSTRADEUP_DOMAIN } from "../lib/env";
 import { IS_CHROME } from "../lib/compat";
+import { APP_ID } from "../lib/consts";
+import { refreshSessions } from "../lib/session";
 const HOSTNAME = CSTRADEUP_HOSTNAME;
 const UPDATE_INVENTORY_ROUTE = "/account/inventory/extension/update";
 const INVENTORY_HISTORY_ROUTE = "/account/inventory/extension/history";
@@ -76,6 +80,63 @@ chrome.runtime.onMessage.addListener(
     if (isStartInventoryHistoryPayload(msg)) {
       loadInventoryHistory(msg);
       return; // fire-and-forget, no sendResponse needed
+    }
+
+    if (isSyncPortfolioPayload(msg)) {
+      (async () => {
+        try {
+          const steamData = await getStore();
+          const cstradeupData = await getCstradeupStore();
+
+          if (!steamData?.token || !steamData?.steam_id) {
+            sendResponse({ success: false, error: "Steam session not found. Please log in to Steam." });
+            return;
+          }
+
+          if (!cstradeupData?.auth) {
+            sendResponse({ success: false, error: "CSTRADEUP auth token not found. Please log in." });
+            return;
+          }
+
+          loadInventoryHistory({
+            type: "START_INVENTORY_HISTORY",
+            steamId: steamData.steam_id,
+            token: steamData.token,
+            auth: cstradeupData.auth,
+          });
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({
+            success: false,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      })();
+      return true; // keep port open for async sendResponse
+    }
+
+    if (isLoadInventoryPayload(msg)) {
+      (async () => {
+        try {
+          const session = await refreshSessions();
+          if (session !== "ready") {
+            sendResponse({
+              success: false,
+              error: `Session not ready: ${session}`,
+            });
+            return;
+          }
+
+          const tab = await findOrCreateSteamInventoryTab();
+          sendResponse(tab?.id ? { success: true } : { success: false, error: "Failed to open Steam inventory tab" });
+        } catch (e) {
+          sendResponse({
+            success: false,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      })();
+      return true; // keep port open for async sendResponse
     }
 
     if (isStopOperationPayload(msg)) {
@@ -314,6 +375,29 @@ export async function openOffscreenDocument(): Promise<void> {
     await creating;
     creating = null;
   }
+}
+
+async function findOrCreateSteamInventoryTab(): Promise<chrome.tabs.Tab | null> {
+  const inventoryUrl = `https://steamcommunity.com/my/inventory/#${APP_ID}`;
+  const tabs = await chrome.tabs.query({});
+
+  const exactInventoryTab = tabs.find((tab) => tab.url?.includes(inventoryUrl));
+  if (exactInventoryTab?.id) {
+    return (await chrome.tabs.update(exactInventoryTab.id, { active: true })) ?? null;
+  }
+
+  const steamTab = tabs.find((tab) => tab.url?.includes("steamcommunity.com"));
+  if (steamTab?.id) {
+    return (await chrome.tabs.update(steamTab.id, {
+      active: true,
+      url: inventoryUrl,
+    })) ?? null;
+  }
+
+  return chrome.tabs.create({
+    url: inventoryUrl,
+    active: true,
+  });
 }
 
 // ---------------------------------------------------------------------------
