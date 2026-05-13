@@ -1,6 +1,6 @@
 {
     "name": "cstradeup-extension",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Analyze your CS2 inventory for profitable trade ups. View hidden skins in your Storage Units and other inventory insights.",
     "license": "MIT",
     "directories": {
