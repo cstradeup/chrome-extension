@@ -1,5 +1,17 @@
 # CSTRADEUP Extension
 
+<p align="center">
+  <a href="https://cstradeup.net/">
+    <img width="500" src="https://github.com/user-attachments/assets/7592a51b-efcc-4f62-acab-8b9cb2cc7c7d"/>
+  </a>
+</p>
+
+[![Chrome Web Store Last Updated](https://img.shields.io/chrome-web-store/last-updated/mgaanpfefgbbefngpkijphdbklkmedbj?style=flat)](https://chromewebstore.google.com/detail/mgaanpfefgbbefngpkijphdbklkmedbj)
+[![Chrome Web Store Version](https://img.shields.io/chrome-web-store/v/mgaanpfefgbbefngpkijphdbklkmedbj?style=flat)](https://chromewebstore.google.com/detail/mgaanpfefgbbefngpkijphdbklkmedbj)
+[![Subreddit subscribers](https://img.shields.io/reddit/subreddit-subscribers/cstradeup?style=flat)](https://www.reddit.com/r/cstradeup/)
+[![YouTube Channel Subscribers](https://img.shields.io/youtube/channel/subscribers/UCwi3vkYFm5A4EurtpizlM4g?style=flat)](https://www.youtube.com/@CSTRADEUP)
+[![X Follow](https://img.shields.io/twitter/follow/cstradeupnet?style=flat)](https://twitter.com/cstradeupnet)
+
 Chrome extension for [cstradeup.net](https://cstradeup.net) — sync your Steam CS2 inventory and trade-up history to track your portfolio, analyze trade-ups, and claim cashback tickets.
 
 ## Features
