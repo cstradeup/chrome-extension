@@ -293,9 +293,9 @@ export async function handleGetWalletInfo(): Promise<GetWalletInfoResult> {
 /**
  * Converts a USD price to the user's Steam wallet currency.
  *
- * Derives Steam's own exchange rate by fetching a known item's render data
- * from a steamcommunity.com tab (MAIN world). Finds a USD-denominated
- * listing and computes `rate = converted_price / price`.
+ * Derives Steam's own exchange rate from a steamcommunity.com tab (MAIN world)
+ * via the modern `QueryListingsForItem` market actions API (the legacy
+ * `/render/` endpoint now returns HTML).
  *
  * If the user's wallet is already USD (currency 1), returns the input as-is.
  */
@@ -461,71 +461,204 @@ function extractWalletInfo(): Record<string, unknown> | null {
 /**
  * Runs inside a steamcommunity.com MAIN-world page context.
  *
- * Fetches the render data for a known reference item and finds a
- * USD-denominated listing (currencyid 2001).  Returns the exchange rate
- * (`converted_price / price`) and the user's wallet currency id.
+ * Derives Steam's USD→wallet FX rate using the modern market actions API:
+ * `GET /market/actions?q=QueryListingsForItem`.
  *
- * Steam's listing data shape:
+ * New listing shape (prices are already in the viewer's currency):
  * ```
  * {
- *   listinginfo: {
- *     "<id>": {
- *       price: number,              // seller amount in seller's currency
- *       fee: number,                // fee in seller's currency
- *       currencyid: number,         // 2000 + seller's currency id
- *       converted_price: number,    // seller amount in buyer's currency
- *       converted_fee: number,
- *       converted_currencyid: number // 2000 + buyer's currency id
- *     }
- *   }
+ *   listingid, unPrice, unFee, eCurrency, strSubtotal, ...
  * }
  * ```
+ *
+ * Strategy (mirrors the old `converted_price / price` approach):
+ * 1. Fetch authenticated listings (wallet / session currency).
+ * 2. Prefer pairing the same `listingid` against a USD view
+ *    (anonymous / IP-regional fetch when that yields eCurrency === 1).
+ * 3. Fall back to `priceoverview?currency=1` as a USD price anchor.
  */
 async function deriveExchangeRate(): Promise<
   { success: true; rate: number; currency: number } |
   { success: false; error: string }
 > {
-  try {
-    const RATE_REFERENCE_ITEM = 'M4A1-S%20%7C%20Black%20Lotus%20%28Field-Tested%29'; // M4A1-S | Black Lotus
+  /** Bucket group id for M4A1-S | Black Lotus (all wears). */
+  const RATE_REFERENCE_BUCKET = 'G183C208E093004';
+  /** Concrete wear used when anchoring against priceoverview. */
+  const RATE_REFERENCE_HASH = 'M4A1-S | Black Lotus (Field-Tested)';
 
-    // First check if the user already uses USD
+  type MarketListing = {
+    listingid: string;
+    unPrice: number;
+    unFee: number;
+    eCurrency: number;
+    description?: { market_hash_name?: string };
+  };
+
+  const median = (values: number[]): number => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+  };
+
+  const parseUsdCents = (priceStr: string): number | null => {
+    // currency=1 always formats like "$5.14" / "$1,234.56"
+    const cleaned = priceStr.replace(/[^0-9.,]/g, '');
+    if (!cleaned) return null;
+    const normalized = cleaned.includes(',') && cleaned.includes('.')
+      ? cleaned.replace(/,/g, '')
+      : cleaned.replace(',', '');
+    const amount = Number.parseFloat(normalized);
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    return Math.round(amount * 100);
+  };
+
+  const fetchListings = async (
+    currencyHint: number,
+    credentials: RequestCredentials,
+  ): Promise<MarketListing[] | null> => {
+    const qp = [
+      {
+        appid: 730,
+        strItemName: RATE_REFERENCE_BUCKET,
+        filters: { Exterior: ['WearCategory2'] }, // Field-Tested
+        accessoryFilters: {},
+        propertyFilters: {},
+        price: { eCurrency: currencyHint },
+        start: 0,
+      },
+    ];
+    const url =
+      'https://steamcommunity.com/market/actions?q=QueryListingsForItem&qp=' +
+      encodeURIComponent(JSON.stringify(qp));
+
+    const resp = await fetch(url, {
+      credentials,
+      headers: { 'x-valve-request-type': 'queryAction' },
+    });
+    if (!resp.ok) return null;
+
+    const body = await resp.json();
+    const listings = body?.data?.listings ?? body?.listings;
+    return Array.isArray(listings) ? (listings as MarketListing[]) : null;
+  };
+
+  try {
     const wallet = (window as any).g_rgWalletInfo;
-    if (wallet && Number(wallet.wallet_currency) === 1) {
+    const walletCurrency =
+      wallet && wallet.wallet_currency != null
+        ? Number(wallet.wallet_currency)
+        : null;
+
+    if (walletCurrency === 1) {
       return { success: true, rate: 1, currency: 1 };
     }
 
-    const url =
-      `https://steamcommunity.com/market/listings/730/${RATE_REFERENCE_ITEM}/render/` +
-      '?query=&start=0&count=100&language=english&currency=3';
-
-    const resp = await fetch(url, { credentials: 'include' });
-    if (!resp.ok) {
-      return { success: false, error: `Render API returned HTTP ${resp.status}` };
+    const authListings = await fetchListings(walletCurrency ?? 1, 'include');
+    if (!authListings || authListings.length === 0) {
+      return {
+        success: false,
+        error: 'No listing info in QueryListingsForItem response.',
+      };
     }
 
-    const data = await resp.json();
-    const listings = data?.listinginfo;
-    if (!listings || typeof listings !== 'object') {
-      return { success: false, error: 'No listing info in render response.' };
+    const currency =
+      walletCurrency ?? Number(authListings[0].eCurrency);
+    if (!Number.isFinite(currency) || currency <= 0) {
+      return { success: false, error: 'Could not determine wallet currency.' };
+    }
+    if (currency === 1) {
+      return { success: true, rate: 1, currency: 1 };
     }
 
-    // Find a listing whose seller currency is USD (currencyid 2001)
-    for (const id of Object.keys(listings)) {
-      const l = listings[id];
-      if (Number(l.currencyid) !== 2001) continue;    // not a USD seller
-      if (!l.price || l.price <= 0) continue;          // skip zero-price
-      if (!l.converted_price || l.converted_price <= 0) continue;
-
-      const rate = l.converted_price / l.price;
-      const currency = Number(l.converted_currencyid) - 2000;
-
-      return { success: true, rate, currency };
+    const walletSamples = authListings.filter(
+      (l) =>
+        Number(l.eCurrency) === currency &&
+        Number(l.unPrice) > 0 &&
+        Number(l.unFee) >= 0,
+    );
+    if (walletSamples.length === 0) {
+      return {
+        success: false,
+        error: 'No usable wallet-currency listings for exchange-rate derivation.',
+      };
     }
 
-    return {
-      success: false,
-      error: 'No USD-denominated listing found for exchange-rate derivation.',
-    };
+    // ── Preferred: same listingid priced in USD vs wallet currency ──────────
+    // Anonymous / IP-regional responses sometimes stay in USD even when the
+    // authenticated session uses another wallet currency.
+    try {
+      const usdListings = await fetchListings(1, 'omit');
+      if (usdListings && usdListings.length > 0) {
+        const usdById = new Map<string, MarketListing>();
+        for (const l of usdListings) {
+          if (Number(l.eCurrency) === 1 && Number(l.unPrice) > 0) {
+            usdById.set(String(l.listingid), l);
+          }
+        }
+
+        const pairedRates: number[] = [];
+        for (const walletListing of walletSamples) {
+          const usdListing = usdById.get(String(walletListing.listingid));
+          if (!usdListing) continue;
+          pairedRates.push(walletListing.unPrice / usdListing.unPrice);
+        }
+
+        if (pairedRates.length > 0) {
+          return { success: true, rate: median(pairedRates), currency };
+        }
+      }
+    } catch {
+      /* anonymous pairing is best-effort */
+    }
+
+    // ── Fallback: USD lowest ask via priceoverview ──────────────────────────
+    const overviewUrl =
+      'https://steamcommunity.com/market/priceoverview/' +
+      `?appid=730&currency=1&market_hash_name=${encodeURIComponent(RATE_REFERENCE_HASH)}`;
+
+    const overviewResp = await fetch(overviewUrl, { credentials: 'include' });
+    if (!overviewResp.ok) {
+      return {
+        success: false,
+        error: `USD priceoverview returned HTTP ${overviewResp.status}`,
+      };
+    }
+
+    const overview = await overviewResp.json();
+    const usdTotal = typeof overview?.lowest_price === 'string'
+      ? parseUsdCents(overview.lowest_price)
+      : null;
+    if (!usdTotal) {
+      return {
+        success: false,
+        error: 'Could not parse USD lowest_price from priceoverview.',
+      };
+    }
+
+    // Compare buyer totals (unPrice + unFee) against USD lowest ask.
+    // FX is linear, so this matches applying the rate to subtotal and fee.
+    const ftSamples = walletSamples.filter(
+      (l) => l.description?.market_hash_name === RATE_REFERENCE_HASH,
+    );
+    const totals = (ftSamples.length > 0 ? ftSamples : walletSamples)
+      .map((l) => l.unPrice + l.unFee)
+      .filter((t) => t > 0);
+
+    if (totals.length === 0) {
+      return {
+        success: false,
+        error: 'No positive wallet-currency totals for exchange-rate derivation.',
+      };
+    }
+
+    const rate = Math.min(...totals) / usdTotal;
+    if (!Number.isFinite(rate) || rate <= 0) {
+      return { success: false, error: 'Derived exchange rate was invalid.' };
+    }
+
+    return { success: true, rate, currency };
   } catch (e: any) {
     return { success: false, error: e?.message ?? String(e) };
   }
