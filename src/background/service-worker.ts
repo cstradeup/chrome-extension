@@ -9,6 +9,7 @@ import {
   isSteamFetchBillingInfoPayload,
   isSteamGetWalletInfoPayload,
   isSteamConvertPricePayload,
+  isTradeitAddToCartPayload,
   isInventoryPayload,
   isLogMessage,
   isNotarizeCursorPayload,
@@ -33,6 +34,7 @@ import { getStore, saveMemberSince, invalidateToken as invalidateSteamToken, sto
 import { appendDevLog } from "../lib/storage/reducer/logs";
 import { loadInventoryHistory, requestStop } from "./services/notary";
 import { handleBuyListing, handleFetchBillingInfo, handleGetWalletInfo, handleConvertPrice } from "./services/steam-market";
+import { handleAddToCart } from "./services/tradeit-market";
 import { getStore as getCstradeupStore, saveHistoryCursor, invalidateAuth as invalidateCstradeupAuth, storeAccessToken as storeCstradeupToken } from "../lib/storage/reducer/cstradeup";
 import { SteamAccountAge } from "./offscreen/user/badges";
 import { syncBadge } from "../lib/badge";
@@ -199,6 +201,14 @@ chrome.runtime.onMessage.addListener(
         subtotal: msg.subtotal,
         fee: msg.fee,
         total: msg.total,
+      }).then(sendResponse);
+      return true; // keep port open
+    }
+
+    if (isTradeitAddToCartPayload(msg)) {
+      handleAddToCart({
+        name: msg.name,
+        float: msg.float,
       }).then(sendResponse);
       return true; // keep port open
     }

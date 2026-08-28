@@ -11,6 +11,7 @@
   ],
   "host_permissions": [
     "https://steamcommunity.com/*",
+    "https://tradeit.gg/*",
     "https://cstradeup.net/*",
     "http://localhost:3000/*",
     "http://*/*"

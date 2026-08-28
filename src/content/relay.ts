@@ -93,6 +93,9 @@ function buildRuntimeMessage(action: string, payload: unknown): Record<string, u
     case 'STEAM:CONVERT_PRICE':
       return { type: 'STEAM_CONVERT_PRICE', ...(payload as object) };
 
+    case 'TRADEIT:ADD_TO_CART':
+      return { type: 'TRADEIT_ADD_TO_CART', ...(payload as object) };
+
     case 'SYNC_PORTFOLIO':
       return { type: 'SYNC_PORTFOLIO' };
 

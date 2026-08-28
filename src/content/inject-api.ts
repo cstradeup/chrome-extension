@@ -218,6 +218,35 @@ const steam: MarketProvider<SteamBuyListingParams, SteamBuyResult, BillingResult
 };
 
 // =============================================================================
+// Tradeit provider
+// =============================================================================
+
+interface TradeitAddToCartParams {
+  /** Full market hash name, e.g. `"AWP | Redline (Field-Tested)"`. */
+  name: string;
+  /** Exact float of the desired skin (matched to 4 decimal places). */
+  float: number;
+}
+
+interface TradeitAddToCartResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Tradeit.gg provider — drives the live trade page UI from the extension.
+ * Currently exposes cart automation only.
+ */
+const tradeit = {
+  /**
+   * Open (or reuse) https://tradeit.gg/csgo/trade and add the skin matching
+   * `name` + `float` to the site cart via UI automation.
+   */
+  addToCart: (params: TradeitAddToCartParams) =>
+    sendToRelay<TradeitAddToCartResult>('TRADEIT:ADD_TO_CART', params, 180_000),
+};
+
+// =============================================================================
 // Expose to page
 // =============================================================================
 
@@ -232,5 +261,6 @@ window.cstradeup = {
   /** Market providers — each key is a provider id. */
   providers: {
     steam,
+    tradeit,
   },
 };
