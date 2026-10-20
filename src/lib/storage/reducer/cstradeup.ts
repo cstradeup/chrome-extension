@@ -37,10 +37,22 @@ export interface CSTRADEUPStore {
     auth?: string;
     updated_at?: number;
     /**
-     * Persisted crawl cursor — the deepest (oldest) point we've crawled to.
-     * Drives the idle progress bar (how far back into history we've gone).
+     * Persisted crawl cursor — Steam pagination boundary used to resume
+     * crawling.  NOT the display "Crawled to" date: on the final page this
+     * is the request cursor (≈ newest event on that page), and even mid-crawl
+     * it can disagree with the oldest event embedded in the page HTML.
+     * Drives the idle progress bar (how far back pagination has advanced).
      */
     history_cursor?: Cursor;
+    /**
+     * Oldest inventory-history event timestamp (Unix seconds) observed
+     * across all crawled pages.  Source of truth for the popup
+     * "Crawled to" label — when a full sync finishes, this is the date of
+     * the account's first inventory history event.
+     *
+     * Updated monotonically (only moves older) as pages are processed.
+     */
+    history_oldest_at?: number;
     /** Whether the full backwards crawl reached Steam's end (no more pages). */
     sync_completed?: boolean;
     /** Current sync phase (null when idle). */
@@ -88,7 +100,7 @@ export async function saveHistoryCursor(cursor: Cursor): Promise<void> {
     });
 }
 
-export async function saveSyncState(update: Partial<Pick<CSTRADEUPStore, 'history_cursor' | 'sync_completed' | 'sync_phase' | 'sync_cursor' | 'sync_left_boundary' | 'sync_pages_fetched' | 'sync_corrupted_at'>>): Promise<void> {
+export async function saveSyncState(update: Partial<Pick<CSTRADEUPStore, 'history_cursor' | 'history_oldest_at' | 'sync_completed' | 'sync_phase' | 'sync_cursor' | 'sync_left_boundary' | 'sync_pages_fetched' | 'sync_corrupted_at'>>): Promise<void> {
     const oldStore = await getStore();
 
     return gStore.setWithStorage<CSTRADEUPStore>(chrome.storage.local, StorageKey.CSTRADEUP_ACCESS_TOKEN, {
@@ -115,9 +127,9 @@ export function clearAccessTokenFromStorage(): Promise<void> {
 
 /**
  * Soft-clears the stored CSTRADEUP auth token while preserving crawl
- * state (history_cursor, sync_completed, sync_phase, etc.).  This lets
- * the extension detect the session is gone and re-show onboarding
- * without losing sync progress.
+ * state (history_cursor, history_oldest_at, sync_completed, sync_phase,
+ * etc.).  This lets the extension detect the session is gone and re-show
+ * onboarding without losing sync progress.
  *
  * Called automatically when the CSTRADEUP `auth` cookie expires or is
  * removed.

@@ -2,91 +2,15 @@ import { ActionAddAppSyncedStorageUnitItems, ActionAddAppSyncedTradeupItems } fr
 import { ActionLogMessage } from "../../../lib/comms/runtime";
 import { uploadUnsignedHistory } from "../../../lib/cstradeup";
 import { Cursor } from "../../../lib/storage/reducer/cstradeup";
-import { buildCookie, buildHeaders, DEFAULT_HISTORY_PARAMS, HistoryParams, InventoryHistoryUploadResult, NotarizationResult, STEAM_CONFIG, SteamHttpError } from "./helpers";
+import { buildCookie, buildHeaders, DEFAULT_HISTORY_PARAMS, HistoryParams, InventoryHistoryUploadResult, STEAM_CONFIG, SteamHttpError } from "./helpers";
+import { extractOldestEventUnix } from "../../../lib/inventory-history/oldest-event";
 
-// =============================================================================
-// Types
-// =============================================================================
-
-export type HttpMethod = "GET" | "POST";
-
-// =============================================================================
-// Response Size Calculation
-// =============================================================================
-
-/**
- * Calculates the expected response size for notarization buffer allocation.
- * Makes an actual request to determine headers and body size.
- */
-export async function calculateResponseSize(
-  url: string,
-  method: HttpMethod,
-  headers: Record<string, string>,
-  body?: string
-): Promise<{ maxRecvData: number }> {
-  const opts: RequestInit = { method, headers, credentials: "include" };
-  if (body) {
-    opts.body = body;
-  }
-
-  const response = await fetch(url, opts);
-
-  await ActionLogMessage(`Response status for size calculation: ${response.status}`);
-
-  // Calculate headers size
-  const statusLine = `HTTP/1.1 ${response.status} ${response.statusText}`;
-  let headersSize = statusLine.length + 2; // +2 for CRLF (\r\n)
-
-  response.headers.forEach((value, name) => {
-    headersSize += name.length + value.length + 4; // ": " and "\r\n"
-  });
-
-  // Headers not included in fetch but present in network response
-  headersSize += "Connection: close".length + 2;
-  headersSize += "X-N: S".length + 2;
-
-  // Final CRLF separating headers from body
-  headersSize += 2;
-
-  // Calculate body size
-  const contentLength = response.headers.get("content-length");
-  if (!contentLength) {
-    throw new Error("No content length in response headers");
-  }
-
-  const bodySize = parseInt(contentLength, 10);
-
-  return { maxRecvData: headersSize + bodySize };
-}
-
-// =============================================================================
-// Request Size Calculation
-// =============================================================================
-
-/**
- * Calculates the request size for notarization buffer allocation.
- */
-export function calculateRequestSize(
-  url: string,
-  method: HttpMethod,
-  headers: Record<string, string>,
-  body?: string
-): number {
-  const encoder = new TextEncoder();
-
-  const requestLineSize = encoder.encode(`${method} ${url} HTTP/1.1\r\n`).length;
-
-  const headersSize = encoder.encode(
-    Object.entries(headers)
-      .map(([key, value]) => `${key}: ${value}\r\n`)
-      .join("")
-  ).length;
-
-  const bodySize = body ? encoder.encode(JSON.stringify(body)).length : 0;
-
-  // +2 for CRLF after headers
-  return requestLineSize + headersSize + 2 + bodySize;
-}
+/** Shape of Steam's inventoryhistory/?ajax=1 JSON body (fields we use). */
+type SteamHistoryPayload = {
+  cursor?: Cursor;
+  html?: string;
+  num?: number;
+};
 
 /**
  * Fetches Steam inventory history using a pre-resolved profile URL.
@@ -96,7 +20,7 @@ export async function fetchSteamHistory(
   profileBaseUrl: string,
   token: string,
   params: HistoryParams
-): Promise<{ data: unknown; cursor: Cursor; }> {
+): Promise<{ data: SteamHistoryPayload; cursor: Cursor; oldestEventUnix: number | null }> {
   const cookie = buildCookie(token);
   const headers = buildHeaders(cookie);
   
@@ -124,24 +48,29 @@ export async function fetchSteamHistory(
     );
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as SteamHistoryPayload;
   const cursor: Cursor = data?.cursor ?? { time: 0, time_frac: 0, s: '0' };
 
-  return { data, cursor};
+  // Oldest event on this page — source of truth for "Crawled to" UI.
+  // HTML dates are authoritative: Steam's pagination cursor may equal the
+  // newest boundary of a page (especially once the crawl hits a terminal
+  // response and we retain the request cursor).  Fall back to cursor.time
+  // only when the HTML fragment has no parseable event dates.
+  const fromHtml = extractOldestEventUnix(data?.html);
+  const fromCursor =
+    typeof cursor.time === 'number' && cursor.time > 0 ? cursor.time : null;
+  const oldestEventUnix = fromHtml ?? fromCursor;
+
+  return { data, cursor, oldestEventUnix };
 }
 
-// =============================================================================
-// Request
-// =============================================================================
-
-
 /**
- * Processes Steam inventory history without notarization.
+ * Processes Steam inventory history and uploads it to the backend.
  *
  * Flow:
  * 1. Fetch inventory history from Steam using pre-resolved URL
- * 2. Upload unsigned to backend to check for crafted items
- * 3. Update cursor and sync counts
+ * 2. Upload to backend for indexing (trade-ups, storage unit moves)
+ * 3. Update sync counts
  *
  * @param profileBaseUrl - Pre-resolved Steam profile base URL (redirect already handled)
  * @param token - Steam login token
@@ -157,21 +86,30 @@ export async function doSteamRequestAndSendToBackend(
 
   // Step 1: Fetch Steam history using pre-resolved URL
   await ActionLogMessage("Fetching Steam inventory history...");
-  const { data: historyData, cursor } = await fetchSteamHistory(profileBaseUrl, token, requestParams);
+  const { data: historyData, cursor, oldestEventUnix } = await fetchSteamHistory(
+    profileBaseUrl,
+    token,
+    requestParams,
+  );
 
-  // Step 2: Upload history to check if notarization is needed
+  // Step 2: Upload history for backend indexing
   await ActionLogMessage("Uploading history to backend...");
   const unsignedResult = await uploadUnsignedHistory(historyData, auth);
 
   await ActionAddAppSyncedTradeupItems(unsignedResult.crafted);
   await ActionAddAppSyncedStorageUnitItems(unsignedResult.moved_to_storage);
 
-  await ActionLogMessage("Chunk processing complete");
+  await ActionLogMessage(
+    oldestEventUnix
+      ? `Chunk processing complete (oldest event: ${new Date(oldestEventUnix * 1000).toISOString()})`
+      : 'Chunk processing complete (no parseable event dates)',
+  );
 
   return {
     success: true,
     crafted: unsignedResult.crafted,
     movedToStorage: unsignedResult.moved_to_storage,
     cursor,
+    oldestEventUnix,
   };
 }

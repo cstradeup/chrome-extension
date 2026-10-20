@@ -1,4 +1,5 @@
-import { Cursor } from "../lib/storage/reducer/cstradeup";
+// Keep this file an ES module (avoids top-level const clashes with relay.ts under tsc).
+export {};
 
 const CHANNEL = '__CSTRADEUP_API__';
 
@@ -76,7 +77,6 @@ function sendToRelay<T = unknown>(action: string, payload: unknown, timeoutMs = 
 // Public API exposed to the website
 // =============================================================================
 
-type NotarizeResult = { success: boolean; crafted?: number; error?: string };
 type SyncPortfolioResult = { success: boolean; error?: string };
 type LoadInventoryResult = { success: boolean; error?: string };
 
@@ -85,12 +85,6 @@ type LoadInventoryResult = { success: boolean; error?: string };
  */
 const loadInventory = async (): Promise<LoadInventoryResult> => {
   return sendToRelay<LoadInventoryResult>('LOAD_INVENTORY', null);
-}
-
-// Used by the website to claim trade up's cashback tickets.
-const notarizeTradeupItems = async (cursorJson: string): Promise<NotarizeResult> => {
-  const cursor: Cursor = JSON.parse(cursorJson);
-  return sendToRelay<NotarizeResult>('NOTARIZE_CURSOR', cursor);
 }
 
 /**
@@ -173,39 +167,35 @@ interface SteamWalletInfo {
 
 type SteamWalletResult = WalletResult<SteamWalletInfo>;
 
-/** USD prices to convert (all in smallest unit, e.g. cents). */
-interface SteamConvertPriceParams {
-  /** Seller-receives amount in USD cents. */
-  subtotal: number;
-  /** Marketplace fee in USD cents. */
-  fee: number;
-  /** subtotal + fee in USD cents. */
-  total: number;
+interface SteamQueryListingParams {
+  /** Steam market bucket group id, e.g. `"G1807208B083004"`. */
+  bucketGroupId: string;
+  /** Item float; queries `float ± 0.0001` unless `floatMin` / `floatMax` are set. */
+  float: number;
+  floatMin?: number;
+  floatMax?: number;
 }
 
-interface SteamConvertedPrice {
-  /** Converted seller-receives amount (user's wallet currency, smallest unit). */
+interface SteamQueriedListing {
+  listingId: string;
   subtotal: number;
-  /** Converted fee (user's wallet currency, smallest unit). */
   fee: number;
-  /** subtotal + fee */
   total: number;
-  /** Steam currency id of the converted price. */
   currency: number;
 }
 
-interface SteamConvertPriceResult {
+interface SteamQueryListingResult {
   success: boolean;
-  price?: SteamConvertedPrice;
+  listing?: SteamQueriedListing;
   error?: string;
 }
 
 const steam: MarketProvider<SteamBuyListingParams, SteamBuyResult, BillingResult, SteamWalletResult> & {
   /**
-   * Convert a USD price to the user's Steam wallet currency.
-   * Returns `{ subtotal, fee, total, currency }` ready to spread into `buyListing`.
+   * Look up a Steam listing by bucket group + float and return the cheapest
+   * match priced in the user's wallet currency (includes `listingId` for buy).
    */
-  convertPrice(params: SteamConvertPriceParams): Promise<SteamConvertPriceResult>;
+  queryListing(params: SteamQueryListingParams): Promise<SteamQueryListingResult>;
 } = {
   buyListing: (params) =>
     sendToRelay<SteamBuyResult>('STEAM:BUY_LISTING', params),
@@ -213,8 +203,37 @@ const steam: MarketProvider<SteamBuyListingParams, SteamBuyResult, BillingResult
     sendToRelay<BillingResult>('STEAM:FETCH_BILLING_INFO', null),
   getWalletInfo: () =>
     sendToRelay<SteamWalletResult>('STEAM:GET_WALLET_INFO', null),
-  convertPrice: (params) =>
-    sendToRelay<SteamConvertPriceResult>('STEAM:CONVERT_PRICE', params),
+  queryListing: (params) =>
+    sendToRelay<SteamQueryListingResult>('STEAM:QUERY_LISTING', params),
+};
+
+// =============================================================================
+// Tradeit provider
+// =============================================================================
+
+interface TradeitAddToCartParams {
+  /** Full market hash name, e.g. `"AWP | Redline (Field-Tested)"`. */
+  name: string;
+  /** Exact float of the desired skin (matched to 4 decimal places). */
+  float: number;
+}
+
+interface TradeitAddToCartResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Tradeit.gg provider — drives the live trade page UI from the extension.
+ * Currently exposes cart automation only.
+ */
+const tradeit = {
+  /**
+   * Open (or reuse) https://tradeit.gg/csgo/trade and add the skin matching
+   * `name` + `float` to the site cart via UI automation.
+   */
+  addToCart: (params: TradeitAddToCartParams) =>
+    sendToRelay<TradeitAddToCartResult>('TRADEIT:ADD_TO_CART', params, 180_000),
 };
 
 // =============================================================================
@@ -225,12 +244,12 @@ const steam: MarketProvider<SteamBuyListingParams, SteamBuyResult, BillingResult
 window.cstradeup = {
   loadInventory,
   syncPortfolio,
-  notarizeTradeupItems,
   isInstalled: true,
   lastUpdatedDate: undefined,
 
   /** Market providers — each key is a provider id. */
   providers: {
     steam,
+    tradeit,
   },
 };

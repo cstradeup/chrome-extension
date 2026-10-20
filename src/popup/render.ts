@@ -196,8 +196,11 @@ export function renderHistoryProgress(
         if (!bestCursorTime && isHistoryOp) {
             setText(els.progressCursorDate, 'Starting…');
         } else if (!isHistoryOp) {
+            // Idle: show the oldest event date we've actually observed
+            // (falls back to pagination cursor for pre-migration state).
+            const crawledTo = cstradeup?.history_oldest_at || historyCursorTime;
             setText(els.progressCursorDate,
-                historyCursorTime ? `At ${formatMediumDate(historyCursorTime)}` : '');
+                crawledTo ? `At ${formatMediumDate(crawledTo)}` : '');
         } else {
             // Active historical crawl — show page count + date
             setText(els.progressCursorDate,
@@ -351,7 +354,15 @@ export function renderTimestamps(els: Elements, state: AppState, cstradeup: CSTR
 
     setText(els.inventoryLastUpdated, timeAgo(now, state.lastInventoryUpdate));
     setText(els.historyLastUpdated,   timeAgo(now, state.lastHistoryUpdate));
-    setText(els.historyUpdatedUntil,  formatCursorDate(cstradeup?.history_cursor?.time ?? 0));
+    // "Crawled to" must reflect the oldest *event* we've seen, not the
+    // pagination cursor (which on the final page is the request boundary ≈
+    // newest event on that page).  Fall back to history_cursor for users
+    // who synced before history_oldest_at was introduced.
+    const crawledTo =
+        cstradeup?.history_oldest_at
+        || cstradeup?.history_cursor?.time
+        || 0;
+    setText(els.historyUpdatedUntil, formatCursorDate(crawledTo));
 }
 
 // ---------------------------------------------------------------------------
@@ -403,15 +414,6 @@ export function renderDebug(els: Elements, steam: Record<string, unknown> | null
         `cstradeup_access_token: ${mask(cstradeup?.auth)}`,
         `profile_part: ${steam?.profile_part ?? 'not set'}`,
     ].join('\n');
-}
-
-// ---------------------------------------------------------------------------
-// Devtools — Options
-// ---------------------------------------------------------------------------
-
-/** Sync the "Notarize Trade Ups" checkbox with persisted AppState. */
-export function renderDevtoolsOptions(els: Elements, state: AppState) {
-
 }
 
 // ---------------------------------------------------------------------------

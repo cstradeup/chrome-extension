@@ -202,8 +202,8 @@ var options = {
               // 2. Firefox MV3 uses background.scripts (not service_worker).
               //    Firefox creates an auto-generated background page and loads
               //    each script via <script> tags.  We include both the main
-              //    background script AND the offscreen bundle so the WASM/Worker
-              //    notarization code runs in the same context — no offscreen API needed.
+              //    background script AND the offscreen bundle so Steam fetches
+              //    run in the same context — no offscreen API needed.
               manifest.background = {
                 scripts: [
                   manifest.background?.service_worker || "service-worker.bundle.js",
@@ -249,15 +249,6 @@ var options = {
     new CopyWebpackPlugin({
       patterns: [
         {
-          from: "node_modules/tlsn-js/build",
-          to: path.join(__dirname, "build"),
-          force: true,
-        },
-      ],
-    }),
-    new CopyWebpackPlugin({
-      patterns: [
-        {
           from: path.join(__dirname, "src", "popup.html"),
           to: path.join(__dirname, "build"),
         },
@@ -288,22 +279,9 @@ var options = {
       cache: false,
       inject: false,
     }), */
-    new webpack.ProvidePlugin({
-      Buffer: ['buffer', 'Buffer'],
-    }),
   ].filter(Boolean),
   infrastructureLogging: {
     level: "info",
-  },
-  // Required by wasm-bindgen-rayon, in order to use SharedArrayBuffer on the Web
-  // Ref:
-  //  - https://github.com/GoogleChromeLabs/wasm-bindgen-rayon#setting-up
-  //  - https://web.dev/i18n/en/coop-coep/
-  devServer: {
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
-    }
   },
 };
 

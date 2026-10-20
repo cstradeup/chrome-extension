@@ -1,33 +1,11 @@
 import {
-  notarizeSteamRequestAndSendToBackend,
-  initThreads,
-} from "./inventory_history/notarize";
-import {
   ActionLogMessage,
-  ActionUpdateAppState,
 } from "../../lib/comms/runtime";
 import { getAccountAge, SteamAccountAge } from "./user/badges";
 import { GetParmsFromCursor, SteamHttpError } from "./inventory_history/helpers";
 import { doSteamRequestAndSendToBackend } from "./inventory_history/request";
 
 import { IS_CHROME } from "../../lib/compat";
-
-// =============================================================================
-// Configuration
-// =============================================================================
-
-/**
- * Maximum prove requests before restarting the offscreen document.
- * Workaround for https://github.com/tlsnotary/tlsn/issues/959
- * The WASM module panics after multiple runs due to thread-local storage not being cleaned up.
- */
-const MAX_PROVE_REQUESTS_BEFORE_RESTART = 10;
-
-// =============================================================================
-// State
-// =============================================================================
-
-let totalProveRequests = 0;
 
 // =============================================================================
 // Types
@@ -49,34 +27,19 @@ type AccountAgeRequest = {
   token: string;
 };
 
-type NotarizeCursorRequest = {
-  target: "offscreen";
-  type: "notarize-cursor";
-  profileBaseUrl: string;
-  token: string;
-  auth: string;
-  cursor: Record<string, string | number>;
-};
-
-type OffscreenRequest = InventoryHistoryRequest | AccountAgeRequest | NotarizeCursorRequest;
+type OffscreenRequest = InventoryHistoryRequest | AccountAgeRequest;
 
 type InventoryHistoryResponse = {
   success: boolean;
   error?: string;
-  shouldShutdown: boolean;
   httpStatus?: number;
+  /** Oldest event Unix timestamp (seconds) on the fetched page, if known. */
+  oldestEventUnix?: number | null;
 };
 
 type AccountAgeResponse = {
   success: boolean;
   age?: SteamAccountAge | null;
-};
-
-type NotarizeCursorResponse = {
-  success: boolean;
-  crafted?: number;
-  error?: string;
-  shouldShutdown: boolean;
 };
 
 // =============================================================================
@@ -86,25 +49,15 @@ type NotarizeCursorResponse = {
 async function handleInventoryHistoryRequest(
   request: InventoryHistoryRequest
 ): Promise<InventoryHistoryResponse> {
-  totalProveRequests++;
-
   try {
-    await doSteamRequestAndSendToBackend(
+    const result = await doSteamRequestAndSendToBackend(
       request.profileBaseUrl ?? "",
       request.token ?? "",
       request.auth ?? "",
       GetParmsFromCursor(request.startCursor ?? {}),
     );
 
-    const shouldShutdown = totalProveRequests >= MAX_PROVE_REQUESTS_BEFORE_RESTART;
-
-    if (shouldShutdown) {
-      await ActionLogMessage(
-        `Offscreen reached ${totalProveRequests} requests, signaling for restart to avoid WASM panic`
-      );
-    }
-
-    return { success: true, shouldShutdown: false };
+    return { success: true, oldestEventUnix: result.oldestEventUnix };
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : String(e);
     const httpStatus = e instanceof SteamHttpError ? e.httpStatus : undefined;
@@ -114,7 +67,7 @@ async function handleInventoryHistoryRequest(
     // would race with the retry logic and overwrite pending warning/retry states.
     await ActionLogMessage(`Offscreen error (HTTP ${httpStatus ?? '?'}): ${errorMsg}`, "error");
 
-    return { success: false, error: errorMsg, shouldShutdown: false, httpStatus };
+    return { success: false, error: errorMsg, httpStatus };
   }
 }
 
@@ -128,35 +81,6 @@ async function handleAccountAgeRequest(
     const errorMsg = e instanceof Error ? e.message : String(e);
     await ActionLogMessage(`Error fetching account age: ${errorMsg}`, "error");
     return { success: false };
-  }
-}
-
-async function handleNotarizeCursorRequest(
-  request: NotarizeCursorRequest
-): Promise<NotarizeCursorResponse> {
-  totalProveRequests++;
-
-  try {
-    const result = await notarizeSteamRequestAndSendToBackend(
-      request.profileBaseUrl,
-      request.token,
-      request.auth,
-      GetParmsFromCursor(request.cursor),
-    );
-
-    const shouldShutdown = totalProveRequests >= MAX_PROVE_REQUESTS_BEFORE_RESTART;
-
-    if (shouldShutdown) {
-      await ActionLogMessage(
-        `Offscreen reached ${totalProveRequests} requests, signaling for restart to avoid WASM panic`
-      );
-    }
-
-    return { success: true, crafted: result.crafted, shouldShutdown };
-  } catch (e) {
-    const errorMsg = e instanceof Error ? e.message : String(e);
-    await ActionLogMessage(`Notarize cursor error: ${errorMsg}`, "error");
-    return { success: false, error: errorMsg, shouldShutdown: true };
   }
 }
 
@@ -178,10 +102,6 @@ function setupMessageListener(): void {
 
         case "load-account-age":
           handleAccountAgeRequest(request).then(sendResponse);
-          break;
-
-        case "notarize-cursor":
-          handleNotarizeCursorRequest(request).then(sendResponse);
           break;
 
         default:
@@ -206,10 +126,5 @@ function signalReady(): void {
 // Initialization
 // =============================================================================
 
-async function initialize(): Promise<void> {
-  await initThreads();
-  setupMessageListener();
-  signalReady();
-}
-
-initialize();
+setupMessageListener();
+signalReady();

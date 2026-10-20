@@ -19,9 +19,9 @@ export type InventoryResponse = {
 
 export type SteamInventoryDataPayload = Record<string, InventoryResponse>;
 
-type TypeMessage = 'POST_TO_API' | 'START_CRAWL' | 'INVENTORY_HISTORY' | 'START_INVENTORY_HISTORY' | 'SYNC_PORTFOLIO' | 'LOAD_INVENTORY' | 'STOP_OPERATION' | 'LOG_MESSAGE' | 'UPDATE_CURSOR' | 'UPDATE_APP_STATE' | 'ENSURE_MEMBER_SINCE' | 'NOTARIZE_CURSOR' | 'STEAM_BUY_LISTING' | 'STEAM_FETCH_BILLING_INFO' | 'STEAM_GET_WALLET_INFO' | 'STEAM_CONVERT_PRICE' | OffscreenMessage
+type TypeMessage = 'POST_TO_API' | 'START_CRAWL' | 'INVENTORY_HISTORY' | 'START_INVENTORY_HISTORY' | 'SYNC_PORTFOLIO' | 'LOAD_INVENTORY' | 'STOP_OPERATION' | 'LOG_MESSAGE' | 'UPDATE_CURSOR' | 'UPDATE_APP_STATE' | 'ENSURE_MEMBER_SINCE' | 'STEAM_BUY_LISTING' | 'STEAM_FETCH_BILLING_INFO' | 'STEAM_GET_WALLET_INFO' | 'STEAM_QUERY_LISTING' | 'TRADEIT_ADD_TO_CART' | OffscreenMessage
 
-type OffscreenMessage = 'ADD_APP_SYNCED_TRADEUP_ITEMS' | 'ADD_APP_SYNCED_STORAGE_UNIT_ITEMS' | 'ADD_NOTARIZED_TRADEUP_ITEMS'
+type OffscreenMessage = 'ADD_APP_SYNCED_TRADEUP_ITEMS' | 'ADD_APP_SYNCED_STORAGE_UNIT_ITEMS'
 
 export type PayloadMessage = {
     type: TypeMessage
@@ -136,16 +136,6 @@ export function isEnsureMemberSince(msg: unknown): msg is EnsureMemberSincePaylo
     return msg.type === 'ENSURE_MEMBER_SINCE'
 }
 
-export type NotarizeCursorPayload = PayloadMessage & {
-    type: 'NOTARIZE_CURSOR',
-    cursor: Cursor,
-}
-
-export function isNotarizeCursorPayload(msg: unknown): msg is NotarizeCursorPayload {
-    if (!isTypePayloadMessage(msg)) return false
-    return msg.type === 'NOTARIZE_CURSOR' && 'cursor' in msg
-}
-
 export type SteamBuyListingPayload = PayloadMessage & {
     type: 'STEAM_BUY_LISTING',
     listingId: string,
@@ -178,19 +168,31 @@ export function isSteamGetWalletInfoPayload(msg: unknown): msg is SteamGetWallet
     return msg.type === 'STEAM_GET_WALLET_INFO'
 }
 
-export type SteamConvertPricePayload = PayloadMessage & {
-    type: 'STEAM_CONVERT_PRICE',
-    subtotal: number,
-    fee: number,
-    total: number,
+export type SteamQueryListingPayload = PayloadMessage & {
+    type: 'STEAM_QUERY_LISTING',
+    bucketGroupId: string,
+    float: number,
+    floatMin?: number,
+    floatMax?: number,
 }
 
-export function isSteamConvertPricePayload(msg: unknown): msg is SteamConvertPricePayload {
+export function isSteamQueryListingPayload(msg: unknown): msg is SteamQueryListingPayload {
     if (!isTypePayloadMessage(msg)) return false
-    return msg.type === 'STEAM_CONVERT_PRICE' && 'subtotal' in msg && 'fee' in msg && 'total' in msg
+    return msg.type === 'STEAM_QUERY_LISTING' && 'bucketGroupId' in msg && 'float' in msg
 }
 
-export type MessageType = ApiPostPayload | InventoryPayload | StartInventoryHistoryPayload | SyncPortfolioPayload | LoadInventoryPayload | StopOperationPayload | LogMessage | UpdateCursor | AppStateUpdate | OffscreenPayloadMessage | EnsureMemberSincePayload | NotarizeCursorPayload | SteamBuyListingPayload | SteamFetchBillingInfoPayload | SteamGetWalletInfoPayload | SteamConvertPricePayload
+export type TradeitAddToCartPayload = PayloadMessage & {
+    type: 'TRADEIT_ADD_TO_CART',
+    name: string,
+    float: number,
+}
+
+export function isTradeitAddToCartPayload(msg: unknown): msg is TradeitAddToCartPayload {
+    if (!isTypePayloadMessage(msg)) return false
+    return msg.type === 'TRADEIT_ADD_TO_CART' && 'name' in msg && 'float' in msg
+}
+
+export type MessageType = ApiPostPayload | InventoryPayload | StartInventoryHistoryPayload | SyncPortfolioPayload | LoadInventoryPayload | StopOperationPayload | LogMessage | UpdateCursor | AppStateUpdate | OffscreenPayloadMessage | EnsureMemberSincePayload | SteamBuyListingPayload | SteamFetchBillingInfoPayload | SteamGetWalletInfoPayload | SteamQueryListingPayload | TradeitAddToCartPayload
 
 export const CSTRADEUPMessage = 'cstradeup_scripts'
 export type CSTRADEUPMessageType = 'cstradeup_scripts'

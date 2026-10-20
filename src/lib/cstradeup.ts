@@ -1,4 +1,3 @@
-import { PresentationJSON } from "tlsn-js/build/types";
 import { Cursor } from "./storage/reducer/cstradeup";
 import { CSTRADEUP_HOSTNAME } from "./env";
 
@@ -11,7 +10,6 @@ const HOSTNAME = CSTRADEUP_HOSTNAME;
 const ROUTES = {
   cursor: "/account/inventory/extension/history/cursor",
   upload: "/account/inventory/extension/history",
-  uploadSigned: "/account/inventory/extension/history/signed",
 } as const;
 
 // =============================================================================
@@ -25,12 +23,6 @@ export type CursorResponse = {
 };
 
 export type UploadHistoryResponse = {
-  verified: boolean;
-  crafted: number;
-  moved_to_storage: number;
-};
-
-export type UploadSignedHistoryResponse = {
   verified: boolean;
   crafted: number;
   moved_to_storage: number;
@@ -101,8 +93,7 @@ export async function getHistoryCursor(auth: string | null): Promise<CursorRespo
 }
 
 /**
- * Uploads unsigned inventory history to check if notarization is needed.
- * Returns crafted count - if positive, the request should be notarized.
+ * Uploads inventory history for backend indexing (trade-ups, storage unit moves).
  */
 export async function uploadUnsignedHistory(
   historyData: unknown,
@@ -112,20 +103,5 @@ export async function uploadUnsignedHistory(
     `${HOSTNAME}${ROUTES.upload}`,
     auth,
     historyData
-  );
-}
-
-/**
- * Uploads notarized/signed presentation for verified history.
- * Only called when crafted items are detected.
- */
-export async function uploadSignedHistory(
-  presentation: PresentationJSON,
-  auth: string
-): Promise<UploadSignedHistoryResponse> {
-  return postJSON<UploadSignedHistoryResponse>(
-    `${HOSTNAME}${ROUTES.uploadSigned}`,
-    auth,
-    { presentation }
   );
 }

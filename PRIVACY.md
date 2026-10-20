@@ -17,10 +17,6 @@ This extension reads your Steam CS2 inventory and history from `steamcommunity.c
 
 All data is sent exclusively to **`https://cstradeup.net`**. No analytics, no trackers, no third-party services.
 
-## TLS Notarization
-
-Notarization is **only triggered when you explicitly request it** — for example, to verify trade-ups and claim website rewards. When triggered, the extension connects to `https://notary.cstradeup.net` and uses [TLSNotary](https://tlsnotary.org/) to produce a cryptographic proof that a Steam response is authentic. Your session cookies are **redacted** from the proof before transmission; the notary server never sees your Steam login.
-
 ## Local storage
 
 The extension stores the following in `chrome.storage.local`:

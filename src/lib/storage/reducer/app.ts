@@ -13,7 +13,6 @@ export interface AppState {
     statusMessage: string;
     status: AppStatus;
     operationStartedAt: number;
-    notarizedTradeupItems: number;
 }
 
 const DEFAULT_APP_STATE: AppState = {
@@ -25,7 +24,6 @@ const DEFAULT_APP_STATE: AppState = {
     statusMessage: 'Idle',
     status: 'idle',
     operationStartedAt: 0,
-    notarizedTradeupItems: 0,
 };
 
 export async function getAppState(): Promise<AppState> {
@@ -91,17 +89,6 @@ export async function updateSyncedStorageUnitItems(count: number): Promise<void>
     const newState: AppState = {
         ...oldState,
         syncedStorageUnitItems: count,
-    };
-
-    return saveAppState(newState);
-}
-
-export async function updateNotarizedTradeupItems(count: number): Promise<void> {
-    const oldState = await getAppState();
-
-    const newState: AppState = {
-        ...oldState,
-        notarizedTradeupItems: count,
     };
 
     return saveAppState(newState);

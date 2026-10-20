@@ -78,9 +78,6 @@ function sendErrorResponse(requestId: number, error: string): void {
 /** Maps an inject-api action to a chrome.runtime message for the service worker. */
 function buildRuntimeMessage(action: string, payload: unknown): Record<string, unknown> | null {
   switch (action) {
-    case 'NOTARIZE_CURSOR':
-      return { type: 'NOTARIZE_CURSOR', cursor: payload };
-
     case 'STEAM:BUY_LISTING':
       return { type: 'STEAM_BUY_LISTING', ...(payload as object) };
 
@@ -90,8 +87,11 @@ function buildRuntimeMessage(action: string, payload: unknown): Record<string, u
     case 'STEAM:GET_WALLET_INFO':
       return { type: 'STEAM_GET_WALLET_INFO' };
 
-    case 'STEAM:CONVERT_PRICE':
-      return { type: 'STEAM_CONVERT_PRICE', ...(payload as object) };
+    case 'STEAM:QUERY_LISTING':
+      return { type: 'STEAM_QUERY_LISTING', ...(payload as object) };
+
+    case 'TRADEIT:ADD_TO_CART':
+      return { type: 'TRADEIT_ADD_TO_CART', ...(payload as object) };
 
     case 'SYNC_PORTFOLIO':
       return { type: 'SYNC_PORTFOLIO' };
