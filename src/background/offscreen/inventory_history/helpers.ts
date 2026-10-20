@@ -20,6 +20,12 @@ export type InventoryHistoryUploadResult = {
     crafted: number;
     movedToStorage: number;
     cursor: Cursor;
+    /**
+     * Oldest event timestamp (Unix seconds) found in this page's HTML.
+     * Distinct from `cursor.time`, which is a pagination boundary and may
+     * reflect the newest event on the page (especially on the final page).
+     */
+    oldestEventUnix: number | null;
 };
 
 /** Typed error for HTTP failures from Steam, preserving the status code. */

@@ -4,11 +4,12 @@ import { getHistoryCursor } from "../../lib/cstradeup";
 import { hasPermission } from "../../lib/permission";
 import { getAppState, updateStatus } from "../../lib/storage/reducer/app";
 import { syncBadge } from "../../lib/badge";
-import { Cursor, DEFAULT_CURSOR, isTerminalCursor, normalizeCursor, saveSyncState, SyncPhase } from "../../lib/storage/reducer/cstradeup";
+import { Cursor, DEFAULT_CURSOR, getStore as getCstradeupStore, isTerminalCursor, normalizeCursor, saveSyncState, SyncPhase } from "../../lib/storage/reducer/cstradeup";
 import { sleep, withTimeout } from "../../lib/utils";
 import { getStore as getSteamStore, saveMemberSince } from "../../lib/storage/reducer/steam";
 import { openOffscreenDocument } from "../service-worker";
 import { ensureLocaleCookies } from "../../lib/session";
+import { olderUnix } from "../../lib/inventory-history/oldest-event";
 
 // =============================================================================
 // Configuration
@@ -239,6 +240,10 @@ export async function loadInventoryHistory(msg: StartInventoryHistoryPayload) {
     }
 
     // ── Initialize sync state ────────────────────────────────────────
+    // Preserve any previously discovered oldest-event date across resumes.
+    const priorStore = await getCstradeupStore();
+    let historyOldestAt = priorStore?.history_oldest_at;
+
     await saveSyncState({
       sync_phase: phase,
       sync_left_boundary: catchUpTarget,
@@ -279,13 +284,15 @@ export async function loadInventoryHistory(msg: StartInventoryHistoryPayload) {
       // ── Fetch one chunk via offscreen (with retry) ─────────────────
       let attempt = 0;
       let consecutive500s = 0;
+      let pageOldestUnix: number | null = null;
 
       while (true) {
         try {
-          await withTimeout(
+          const pageResult = await withTimeout(
             sendToOffscreen(profile.baseUrl, msg.token, msg.auth, currentCursor),
             TIMEOUT,
           );
+          pageOldestUnix = pageResult.oldestEventUnix ?? null;
           await sleep(2500);
           break; // success
         } catch (e) {
@@ -338,6 +345,7 @@ export async function loadInventoryHistory(msg: StartInventoryHistoryPayload) {
         await saveSyncState({
           sync_corrupted_at: currentCursor,
           ...(phase === 'historical' ? { history_cursor: currentCursor } : {}),
+          ...(historyOldestAt ? { history_oldest_at: historyOldestAt } : {}),
         });
 
         await updateStatus('warning',
@@ -347,6 +355,11 @@ export async function loadInventoryHistory(msg: StartInventoryHistoryPayload) {
         );
         break; // Exit the main crawl loop
       }
+
+      // Fold this page's oldest event into the session / persisted value.
+      // Always update (any phase) — catching_up pages are newer, so min()
+      // is a no-op; historical pages push the date further into the past.
+      historyOldestAt = olderUnix(historyOldestAt, pageOldestUnix);
 
       pagesCount++;
       syncBadge('updating_history', `${pagesCount}`);
@@ -371,6 +384,9 @@ export async function loadInventoryHistory(msg: StartInventoryHistoryPayload) {
         // ends and sync_cursor is cleared, the bar falls back to
         // history_cursor seamlessly.
         ...(phase === 'historical' ? { history_cursor: progressCursor } : {}),
+        // Always persist the deepest event date we've actually seen —
+        // this is what the popup shows as "Crawled to".
+        ...(historyOldestAt ? { history_oldest_at: historyOldestAt } : {}),
       });
 
       // ── Stop: no more pages from Steam ─────────────────────────────
@@ -441,7 +457,15 @@ export async function loadInventoryHistory(msg: StartInventoryHistoryPayload) {
     await saveSyncState({
       ...(isNowComplete ? { sync_completed: true } : {}),
       ...(phase === 'historical' ? { history_cursor: currentCursor } : {}),
+      ...(historyOldestAt ? { history_oldest_at: historyOldestAt } : {}),
     });
+
+    if (isNowComplete && historyOldestAt) {
+      await ActionLogMessage(
+        `Full sync complete — first inventory history event at ` +
+        `${new Date(historyOldestAt * 1000).toISOString()}`,
+      );
+    }
 
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") {
@@ -470,6 +494,11 @@ export async function loadInventoryHistory(msg: StartInventoryHistoryPayload) {
 // Offscreen Communication
 // =============================================================================
 
+/** Result of a successful offscreen inventory-history page fetch. */
+export type OffscreenHistoryPageResult = {
+  oldestEventUnix: number | null;
+};
+
 /**
  * Sends inventory history request to offscreen document.
  * @param profileBaseUrl - The resolved Steam profile base URL (already redirect-resolved)
@@ -482,7 +511,7 @@ export async function sendToOffscreen(
   token: string | null,
   auth: string | null,
   startCursor: Cursor | null,
-) {
+): Promise<OffscreenHistoryPageResult> {
   const granted = await hasPermission([], ["https://steamcommunity.com/*"]);
 
   if (!granted) {
@@ -510,5 +539,10 @@ export async function sendToOffscreen(
     throw new Error(`Offscreen processing failed: ${resp.error}`);
   }
 
-  return true;
+  const oldest =
+    typeof resp?.oldestEventUnix === 'number' && resp.oldestEventUnix > 0
+      ? resp.oldestEventUnix
+      : null;
+
+  return { oldestEventUnix: oldest };
 }

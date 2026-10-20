@@ -33,6 +33,8 @@ type InventoryHistoryResponse = {
   success: boolean;
   error?: string;
   httpStatus?: number;
+  /** Oldest event Unix timestamp (seconds) on the fetched page, if known. */
+  oldestEventUnix?: number | null;
 };
 
 type AccountAgeResponse = {
@@ -48,14 +50,14 @@ async function handleInventoryHistoryRequest(
   request: InventoryHistoryRequest
 ): Promise<InventoryHistoryResponse> {
   try {
-    await doSteamRequestAndSendToBackend(
+    const result = await doSteamRequestAndSendToBackend(
       request.profileBaseUrl ?? "",
       request.token ?? "",
       request.auth ?? "",
       GetParmsFromCursor(request.startCursor ?? {}),
     );
 
-    return { success: true };
+    return { success: true, oldestEventUnix: result.oldestEventUnix };
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : String(e);
     const httpStatus = e instanceof SteamHttpError ? e.httpStatus : undefined;

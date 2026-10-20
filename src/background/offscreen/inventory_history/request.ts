@@ -3,6 +3,14 @@ import { ActionLogMessage } from "../../../lib/comms/runtime";
 import { uploadUnsignedHistory } from "../../../lib/cstradeup";
 import { Cursor } from "../../../lib/storage/reducer/cstradeup";
 import { buildCookie, buildHeaders, DEFAULT_HISTORY_PARAMS, HistoryParams, InventoryHistoryUploadResult, STEAM_CONFIG, SteamHttpError } from "./helpers";
+import { extractOldestEventUnix } from "../../../lib/inventory-history/oldest-event";
+
+/** Shape of Steam's inventoryhistory/?ajax=1 JSON body (fields we use). */
+type SteamHistoryPayload = {
+  cursor?: Cursor;
+  html?: string;
+  num?: number;
+};
 
 /**
  * Fetches Steam inventory history using a pre-resolved profile URL.
@@ -12,7 +20,7 @@ export async function fetchSteamHistory(
   profileBaseUrl: string,
   token: string,
   params: HistoryParams
-): Promise<{ data: unknown; cursor: Cursor; }> {
+): Promise<{ data: SteamHistoryPayload; cursor: Cursor; oldestEventUnix: number | null }> {
   const cookie = buildCookie(token);
   const headers = buildHeaders(cookie);
   
@@ -40,10 +48,20 @@ export async function fetchSteamHistory(
     );
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as SteamHistoryPayload;
   const cursor: Cursor = data?.cursor ?? { time: 0, time_frac: 0, s: '0' };
 
-  return { data, cursor};
+  // Oldest event on this page — source of truth for "Crawled to" UI.
+  // HTML dates are authoritative: Steam's pagination cursor may equal the
+  // newest boundary of a page (especially once the crawl hits a terminal
+  // response and we retain the request cursor).  Fall back to cursor.time
+  // only when the HTML fragment has no parseable event dates.
+  const fromHtml = extractOldestEventUnix(data?.html);
+  const fromCursor =
+    typeof cursor.time === 'number' && cursor.time > 0 ? cursor.time : null;
+  const oldestEventUnix = fromHtml ?? fromCursor;
+
+  return { data, cursor, oldestEventUnix };
 }
 
 /**
@@ -68,7 +86,11 @@ export async function doSteamRequestAndSendToBackend(
 
   // Step 1: Fetch Steam history using pre-resolved URL
   await ActionLogMessage("Fetching Steam inventory history...");
-  const { data: historyData, cursor } = await fetchSteamHistory(profileBaseUrl, token, requestParams);
+  const { data: historyData, cursor, oldestEventUnix } = await fetchSteamHistory(
+    profileBaseUrl,
+    token,
+    requestParams,
+  );
 
   // Step 2: Upload history for backend indexing
   await ActionLogMessage("Uploading history to backend...");
@@ -77,12 +99,17 @@ export async function doSteamRequestAndSendToBackend(
   await ActionAddAppSyncedTradeupItems(unsignedResult.crafted);
   await ActionAddAppSyncedStorageUnitItems(unsignedResult.moved_to_storage);
 
-  await ActionLogMessage("Chunk processing complete");
+  await ActionLogMessage(
+    oldestEventUnix
+      ? `Chunk processing complete (oldest event: ${new Date(oldestEventUnix * 1000).toISOString()})`
+      : 'Chunk processing complete (no parseable event dates)',
+  );
 
   return {
     success: true,
     crafted: unsignedResult.crafted,
     movedToStorage: unsignedResult.moved_to_storage,
     cursor,
+    oldestEventUnix,
   };
 }
