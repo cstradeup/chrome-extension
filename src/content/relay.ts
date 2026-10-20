@@ -78,9 +78,6 @@ function sendErrorResponse(requestId: number, error: string): void {
 /** Maps an inject-api action to a chrome.runtime message for the service worker. */
 function buildRuntimeMessage(action: string, payload: unknown): Record<string, unknown> | null {
   switch (action) {
-    case 'NOTARIZE_CURSOR':
-      return { type: 'NOTARIZE_CURSOR', cursor: payload };
-
     case 'STEAM:BUY_LISTING':
       return { type: 'STEAM_BUY_LISTING', ...(payload as object) };
 

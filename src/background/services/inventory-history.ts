@@ -9,7 +9,6 @@ import { sleep, withTimeout } from "../../lib/utils";
 import { getStore as getSteamStore, saveMemberSince } from "../../lib/storage/reducer/steam";
 import { openOffscreenDocument } from "../service-worker";
 import { ensureLocaleCookies } from "../../lib/session";
-import { IS_CHROME } from "../../lib/compat";
 
 // =============================================================================
 // Configuration
@@ -502,16 +501,6 @@ export async function sendToOffscreen(
     auth,
     startCursor,
   });
-
-    // Check if offscreen signaled it should be closed (WASM workaround for tlsn issue #959)
-    if (resp?.shouldShutdown && IS_CHROME) {
-        const hasExistingContext = await chrome.offscreen.hasDocument();
-
-        if (hasExistingContext) {  
-            await ActionLogMessage("Closing offscreen document to reset WASM state (preventing thread overflow panic)");
-            await chrome.offscreen.closeDocument();
-        }
-    }
 
   if (resp?.success === false && resp?.error) {
     // Preserve Steam HTTP status for corruption detection in the retry loop

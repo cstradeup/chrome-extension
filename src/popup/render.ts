@@ -406,15 +406,6 @@ export function renderDebug(els: Elements, steam: Record<string, unknown> | null
 }
 
 // ---------------------------------------------------------------------------
-// Devtools — Options
-// ---------------------------------------------------------------------------
-
-/** Sync the "Notarize Trade Ups" checkbox with persisted AppState. */
-export function renderDevtoolsOptions(els: Elements, state: AppState) {
-
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

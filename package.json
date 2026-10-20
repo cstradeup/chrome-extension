@@ -76,9 +76,5 @@
         "webpack-ext-reloader": "^1.1.12",
         "zip-webpack-plugin": "^4.0.1"
     },
-    "dependencies": {
-        "comlink": "^4.4.2",
-        "tlsn-js": "0.1.0-alpha.12.0"
-    },
     "overrides": {}
 }

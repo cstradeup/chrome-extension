@@ -12,19 +12,15 @@ import {
   isTradeitAddToCartPayload,
   isInventoryPayload,
   isLogMessage,
-  isNotarizeCursorPayload,
   isOffscreenPayloadMessage,
   isSyncPortfolioPayload,
   isStartInventoryHistoryPayload,
   isStopOperationPayload,
   isUpdateCursor,
   MessageType,
-  PayloadMessage,
 } from "../lib/app";
-import { hasPermission } from "../lib/permission";
 import {
   getAppState,
-  updateNotarizedTradeupItems,
   updateStatus,
   updateSyncedInventoryItems,
   updateSyncedStorageUnitItems,
@@ -32,7 +28,7 @@ import {
 } from "../lib/storage/reducer/app";
 import { getStore, saveMemberSince, invalidateToken as invalidateSteamToken, storeAccessToken as storeSteamToken } from "../lib/storage/reducer/steam";
 import { appendDevLog } from "../lib/storage/reducer/logs";
-import { loadInventoryHistory, requestStop } from "./services/notary";
+import { loadInventoryHistory, requestStop } from "./services/inventory-history";
 import { handleBuyListing, handleFetchBillingInfo, handleGetWalletInfo, handleQueryListing } from "./services/steam-market";
 import { handleAddToCart } from "./services/tradeit-market";
 import { getStore as getCstradeupStore, saveHistoryCursor, invalidateAuth as invalidateCstradeupAuth, storeAccessToken as storeCstradeupToken } from "../lib/storage/reducer/cstradeup";
@@ -44,7 +40,6 @@ import { APP_ID } from "../lib/consts";
 import { refreshSessions } from "../lib/session";
 const HOSTNAME = CSTRADEUP_HOSTNAME;
 const UPDATE_INVENTORY_ROUTE = "/account/inventory/extension/update";
-const INVENTORY_HISTORY_ROUTE = "/account/inventory/extension/history";
 
 
 // Initialize badge to match persisted app state on service worker startup
@@ -170,11 +165,6 @@ chrome.runtime.onMessage.addListener(
       return true; // keep port open
     }
 
-    if (isNotarizeCursorPayload(msg)) {
-      handleNotarizeCursor(msg.cursor).then(sendResponse);
-      return true; // keep port open
-    }
-
     if (isSteamBuyListingPayload(msg)) {
       handleBuyListing({
         listingId: msg.listingId,
@@ -227,12 +217,6 @@ chrome.runtime.onMessage.addListener(
           const newCount = appState.syncedStorageUnitItems + msg.amount;
           await updateSyncedStorageUnitItems(newCount);
         }
-
-        if (msg.type === "ADD_NOTARIZED_TRADEUP_ITEMS") {
-          const appState = await getAppState();
-          const newCount = appState.notarizedTradeupItems + msg.amount;
-          await updateNotarizedTradeupItems(newCount);
-        }
       })();
       return; // fire-and-forget
     }
@@ -249,97 +233,12 @@ async function postToApi(route: string, payload: unknown) {
   return resp;
 }
 
-// ---------------------------------------------------------------------------
-// On-demand notarization (triggered by website frontend)
-// ---------------------------------------------------------------------------
-
-/**
- * Resolves the Steam profile URL by following redirects (custom URL → canonical).
- */
-async function resolveProfileBaseUrl(steamId: string, token: string): Promise<string> {
-  const profileUrl = `https://steamcommunity.com/profiles/${steamId}`;
-  const cookie = `steamLoginSecure=${encodeURIComponent(token)}`;
-
-  try {
-    const response = await fetch(profileUrl, {
-      method: "HEAD",
-      credentials: "include",
-      headers: { Cookie: cookie },
-      redirect: "follow",
-    });
-    const finalUrl = new URL(response.url);
-    const pathParts = finalUrl.pathname.split("/").filter(Boolean);
-    if (pathParts.length >= 2) {
-      return `${finalUrl.origin}/${pathParts[0]}/${pathParts[1]}`;
-    }
-    return `${finalUrl.origin}${finalUrl.pathname}`.replace(/\/$/, "");
-  } catch {
-    return profileUrl;
-  }
-}
-
-import { Cursor } from "../lib/storage/reducer/cstradeup";
-
-async function handleNotarizeCursor(
-  cursor: Cursor,
-): Promise<{ success: boolean; crafted?: number; error?: string }> {
-  try {
-    // 1. Resolve credentials from extension storage
-    const steamStore = await getStore();
-    const cstradeupStore = await getCstradeupStore();
-
-    if (!steamStore?.token || !steamStore?.steam_id) {
-      return { success: false, error: "Steam session not found. Please log in to Steam." };
-    }
-
-    if (!cstradeupStore?.auth) {
-      return { success: false, error: "CSTRADEUP auth token not found. Please log in." };
-    }
-
-    // 2. Resolve Steam profile URL
-    const profileBaseUrl = await resolveProfileBaseUrl(steamStore.steam_id, steamStore.token);
-
-    // 3. Open offscreen document and forward request.
-    //    Chrome: dynamically creates an offscreen document via chrome.offscreen API.
-    //    Firefox: no-op — the offscreen bundle is already loaded in background_ff.html.
-    await openOffscreenDocument();
-
-    const resp = await chrome.runtime.sendMessage({
-      type: "notarize-cursor",
-      target: "offscreen",
-      profileBaseUrl,
-      token: steamStore.token,
-      auth: cstradeupStore.auth,
-      cursor,
-    });
-
-    // Handle WASM restart signal (same pattern as existing notarization)
-    // chrome.offscreen API is Chrome-only; Firefox background page persists.
-    if (resp?.shouldShutdown && IS_CHROME) {
-      const hasDoc = await chrome.offscreen.hasDocument();
-      if (hasDoc) {
-        await chrome.offscreen.closeDocument();
-      }
-    }
-
-    if (!resp?.success) {
-      return { success: false, error: resp?.error ?? "Notarization failed" };
-    }
-
-    return { success: true, crafted: resp.crafted };
-  } catch (e) {
-    const errorMsg = e instanceof Error ? e.message : String(e);
-    console.error("[CSTRADEUP] handleNotarizeCursor error:", errorMsg);
-    return { success: false, error: errorMsg };
-  }
-}
-
 const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 
 let creating: Promise<void> | null = null;
 
 /**
- * Opens the Chrome offscreen document for WASM operations.
+ * Opens the Chrome offscreen document used for Steam fetches.
  *
  * On Chrome: creates a separate offscreen document via the chrome.offscreen API.
  * On Firefox: no-op — the offscreen bundle is loaded directly in the persistent
@@ -377,8 +276,8 @@ export async function openOffscreenDocument(): Promise<void> {
 
       await chrome.offscreen.createDocument({
         url: OFFSCREEN_DOCUMENT_PATH,
-        reasons: [chrome.offscreen.Reason.WORKERS],
-        justification: "Workers for multi-threading",
+        reasons: [chrome.offscreen.Reason.DOM_SCRAPING],
+        justification: "Fetch Steam inventory history and account age with cookie credentials",
       });
 
       await ready;

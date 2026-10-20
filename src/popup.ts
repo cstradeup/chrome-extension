@@ -22,7 +22,7 @@ import { refreshSessions, checkOnboardingState } from './lib/session';
 
 import { queryElements }                       from './popup/elements';
 import { wireActions }                         from './popup/actions';
-import { renderOnboarding, renderStatus, renderCounts, renderTimestamps, renderElapsed, renderLogs, renderDebug, renderHistoryProgress, renderDevtoolsOptions } from './popup/render';
+import { renderOnboarding, renderStatus, renderCounts, renderTimestamps, renderElapsed, renderLogs, renderDebug, renderHistoryProgress } from './popup/render';
 import { ActionEnsureMemberSince }             from './lib/comms/runtime';
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,6 @@ async function fullRender(els: ReturnType<typeof queryElements>) {
     renderCounts(els, appState);
     renderTimestamps(els, appState, cstradeupData);
     renderElapsed(els, appState.operationStartedAt);
-    renderDevtoolsOptions(els, appState);
     renderHistoryProgress(
         els,
         appState.status,
@@ -187,7 +186,6 @@ async function onStorageChanged(
         if (state) {
             renderStatus(els, state);
             renderCounts(els, state);
-            renderDevtoolsOptions(els, state);
             cachedOperationStartedAt = state.operationStartedAt;
 
             const cstradeupData = await getCstradeupStore();

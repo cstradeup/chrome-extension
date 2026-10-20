@@ -1,4 +1,5 @@
-import { Cursor } from "../lib/storage/reducer/cstradeup";
+// Keep this file an ES module (avoids top-level const clashes with relay.ts under tsc).
+export {};
 
 const CHANNEL = '__CSTRADEUP_API__';
 
@@ -76,7 +77,6 @@ function sendToRelay<T = unknown>(action: string, payload: unknown, timeoutMs = 
 // Public API exposed to the website
 // =============================================================================
 
-type NotarizeResult = { success: boolean; crafted?: number; error?: string };
 type SyncPortfolioResult = { success: boolean; error?: string };
 type LoadInventoryResult = { success: boolean; error?: string };
 
@@ -85,12 +85,6 @@ type LoadInventoryResult = { success: boolean; error?: string };
  */
 const loadInventory = async (): Promise<LoadInventoryResult> => {
   return sendToRelay<LoadInventoryResult>('LOAD_INVENTORY', null);
-}
-
-// Used by the website to claim trade up's cashback tickets.
-const notarizeTradeupItems = async (cursorJson: string): Promise<NotarizeResult> => {
-  const cursor: Cursor = JSON.parse(cursorJson);
-  return sendToRelay<NotarizeResult>('NOTARIZE_CURSOR', cursor);
 }
 
 /**
@@ -250,7 +244,6 @@ const tradeit = {
 window.cstradeup = {
   loadInventory,
   syncPortfolio,
-  notarizeTradeupItems,
   isInstalled: true,
   lastUpdatedDate: undefined,
 

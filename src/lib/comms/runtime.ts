@@ -1,5 +1,4 @@
-import { ApiPostPayload, InventoryPayload, InventoryResponse, LogMessage, NotarizeCursorPayload, StartInventoryHistoryPayload, StopOperationPayload } from "../app";
-import { Cursor } from "../storage/reducer/cstradeup";
+import { ApiPostPayload, InventoryPayload, InventoryResponse, LogMessage, StartInventoryHistoryPayload, StopOperationPayload } from "../app";
 
 export async function ActionPostApi(steamId: string, results: Record<string, InventoryResponse>) {
     // Send inventory data to background to POST to API (avoids CORS)
@@ -71,18 +70,6 @@ export async function ActionEnsureMemberSince(): Promise<{ ok: boolean }> {
     return new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'ENSURE_MEMBER_SINCE' }, (resp) => {
             resolve(resp ?? { ok: false });
-        });
-    });
-}
-
-/**
- * Ask the service worker to notarize a specific inventory history cursor.
- * Used by the website frontend to validate individual tradeups on demand.
- */
-export async function ActionNotarizeCursor(cursor: Cursor): Promise<{ success: boolean; crafted?: number; error?: string }> {
-    return new Promise((resolve) => {
-        chrome.runtime.sendMessage<NotarizeCursorPayload>({ type: 'NOTARIZE_CURSOR', cursor }, (resp) => {
-            resolve(resp ?? { success: false, error: 'No response from service worker' });
         });
     });
 }

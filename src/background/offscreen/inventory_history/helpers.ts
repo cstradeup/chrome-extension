@@ -1,7 +1,4 @@
-
-import { ActionLogMessage } from "../../../lib/comms/runtime";
 import { Cursor } from "../../../lib/storage/reducer/cstradeup";
-import { HttpMethod } from "./request";
 
 export type HistoryParams = {
   ajax: string;
@@ -23,11 +20,6 @@ export type InventoryHistoryUploadResult = {
     crafted: number;
     movedToStorage: number;
     cursor: Cursor;
-};
-
-export type NotarizationResult = {
-  notarized: boolean;
-  crafted: number;
 };
 
 /** Typed error for HTTP failures from Steam, preserving the status code. */
@@ -84,48 +76,4 @@ export function buildHeaders(cookie: string): SteamHeaders {
     "Accept-Encoding": "gzip",
     Cookie: cookie,
   };
-}
-
-/**
- * Checks if a URL redirects and returns the final URL if so.
- */
-export async function isRedirect(
-  url: string,
-  method: HttpMethod,
-  headers: Record<string, string>,
-  body?: string
-): Promise<string | null> {
-  const opts: RequestInit = {
-    method,
-    headers,
-    credentials: "include",
-  };
-
-  if (body) {
-    opts.body = body;
-  }
-
-  try {
-    const response = await fetch(url, opts);
-
-    await ActionLogMessage(`Redirect check response URL: ${response.url}`);
-
-    // Check if we were redirected (URL changed)
-    if (response.url !== url) {
-      return response.url;
-    }
-
-    // Check for 3xx redirect status with Location header
-    if (response.status >= 300 && response.status < 400) {
-      return response.headers.get("Location");
-    }
-
-    return null;
-  } catch (error) {
-    await ActionLogMessage(
-      `Fetch error: ${error instanceof Error ? error.message : "Unknown error"}`,
-      "error"
-    );
-    return null;
-  }
 }
