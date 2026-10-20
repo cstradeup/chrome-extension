@@ -8,7 +8,7 @@ import {
   isSteamBuyListingPayload,
   isSteamFetchBillingInfoPayload,
   isSteamGetWalletInfoPayload,
-  isSteamConvertPricePayload,
+  isSteamQueryListingPayload,
   isTradeitAddToCartPayload,
   isInventoryPayload,
   isLogMessage,
@@ -33,7 +33,7 @@ import {
 import { getStore, saveMemberSince, invalidateToken as invalidateSteamToken, storeAccessToken as storeSteamToken } from "../lib/storage/reducer/steam";
 import { appendDevLog } from "../lib/storage/reducer/logs";
 import { loadInventoryHistory, requestStop } from "./services/notary";
-import { handleBuyListing, handleFetchBillingInfo, handleGetWalletInfo, handleConvertPrice } from "./services/steam-market";
+import { handleBuyListing, handleFetchBillingInfo, handleGetWalletInfo, handleQueryListing } from "./services/steam-market";
 import { handleAddToCart } from "./services/tradeit-market";
 import { getStore as getCstradeupStore, saveHistoryCursor, invalidateAuth as invalidateCstradeupAuth, storeAccessToken as storeCstradeupToken } from "../lib/storage/reducer/cstradeup";
 import { SteamAccountAge } from "./offscreen/user/badges";
@@ -196,11 +196,12 @@ chrome.runtime.onMessage.addListener(
       return true; // keep port open
     }
 
-    if (isSteamConvertPricePayload(msg)) {
-      handleConvertPrice({
-        subtotal: msg.subtotal,
-        fee: msg.fee,
-        total: msg.total,
+    if (isSteamQueryListingPayload(msg)) {
+      handleQueryListing({
+        bucketGroupId: msg.bucketGroupId,
+        float: msg.float,
+        floatMin: msg.floatMin,
+        floatMax: msg.floatMax,
       }).then(sendResponse);
       return true; // keep port open
     }

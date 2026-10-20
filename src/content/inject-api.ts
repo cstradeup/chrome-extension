@@ -173,39 +173,35 @@ interface SteamWalletInfo {
 
 type SteamWalletResult = WalletResult<SteamWalletInfo>;
 
-/** USD prices to convert (all in smallest unit, e.g. cents). */
-interface SteamConvertPriceParams {
-  /** Seller-receives amount in USD cents. */
-  subtotal: number;
-  /** Marketplace fee in USD cents. */
-  fee: number;
-  /** subtotal + fee in USD cents. */
-  total: number;
+interface SteamQueryListingParams {
+  /** Steam market bucket group id, e.g. `"G1807208B083004"`. */
+  bucketGroupId: string;
+  /** Item float; queries `float ± 0.0001` unless `floatMin` / `floatMax` are set. */
+  float: number;
+  floatMin?: number;
+  floatMax?: number;
 }
 
-interface SteamConvertedPrice {
-  /** Converted seller-receives amount (user's wallet currency, smallest unit). */
+interface SteamQueriedListing {
+  listingId: string;
   subtotal: number;
-  /** Converted fee (user's wallet currency, smallest unit). */
   fee: number;
-  /** subtotal + fee */
   total: number;
-  /** Steam currency id of the converted price. */
   currency: number;
 }
 
-interface SteamConvertPriceResult {
+interface SteamQueryListingResult {
   success: boolean;
-  price?: SteamConvertedPrice;
+  listing?: SteamQueriedListing;
   error?: string;
 }
 
 const steam: MarketProvider<SteamBuyListingParams, SteamBuyResult, BillingResult, SteamWalletResult> & {
   /**
-   * Convert a USD price to the user's Steam wallet currency.
-   * Returns `{ subtotal, fee, total, currency }` ready to spread into `buyListing`.
+   * Look up a Steam listing by bucket group + float and return the cheapest
+   * match priced in the user's wallet currency (includes `listingId` for buy).
    */
-  convertPrice(params: SteamConvertPriceParams): Promise<SteamConvertPriceResult>;
+  queryListing(params: SteamQueryListingParams): Promise<SteamQueryListingResult>;
 } = {
   buyListing: (params) =>
     sendToRelay<SteamBuyResult>('STEAM:BUY_LISTING', params),
@@ -213,8 +209,8 @@ const steam: MarketProvider<SteamBuyListingParams, SteamBuyResult, BillingResult
     sendToRelay<BillingResult>('STEAM:FETCH_BILLING_INFO', null),
   getWalletInfo: () =>
     sendToRelay<SteamWalletResult>('STEAM:GET_WALLET_INFO', null),
-  convertPrice: (params) =>
-    sendToRelay<SteamConvertPriceResult>('STEAM:CONVERT_PRICE', params),
+  queryListing: (params) =>
+    sendToRelay<SteamQueryListingResult>('STEAM:QUERY_LISTING', params),
 };
 
 // =============================================================================
